@@ -1,0 +1,186 @@
+# src/app/api/endpoints/invoices.py
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List, Optional
+from datetime import datetime
+import math
+
+from app.api.dependencies import get_db
+from app.db import models, schemas
+from app.utils import data_formatting
+
+router = APIRouter()
+
+@router.get("/", response_model=List[schemas.Invoice])
+def get_invoices(status: Optional[str] = None, db: Session = Depends(get_db)):
+    """
+    Gets a list of invoices, filterable by status.
+    """
+    query = db.query(models.Invoice)
+    if status:
+        # Allow filtering by new and legacy statuses for compatibility
+        try:
+            status_enum = models.DocumentStatus(status)
+            query = query.filter(models.Invoice.status == status_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status value: {status}")
+    return query.order_by(models.Invoice.invoice_date.desc()).all()
+
+
+@router.get("/{invoice_id}/details")
+def get_invoice_details(invoice_id: str, db: Session = Depends(get_db)):
+    """
+    Retrieves all linked information for a single invoice.
+    This is a raw data endpoint, for a more user-friendly version use /dossier.
+    """
+    invoice = db.query(models.Invoice).filter(models.Invoice.invoice_id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    po = None
+    # Find PO through GRN first
+    if invoice.grn and invoice.grn.po:
+        po = invoice.grn.po
+    # Fallback to direct PO link on invoice if no GRN link
+    elif invoice.po_number:
+        po = db.query(models.PurchaseOrder).filter(models.PurchaseOrder.po_number == invoice.po_number).first()
+
+
+    response = {
+        "invoice": schemas.Invoice.from_orm(invoice),
+        "grn": schemas.GoodsReceiptNote.from_orm(invoice.grn) if invoice.grn else None,
+        "po": schemas.PurchaseOrder.from_orm(po) if po else None
+    }
+    return response
+
+@router.post("/{invoice_id}/update-status")
+def update_invoice_status_endpoint(
+    invoice_id: str,
+    request: schemas.UpdateInvoiceStatusRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint to update an invoice's status (e.g., approve, reject, pay).
+    Now sets paid_date when status is updated to 'paid'.
+    """
+    invoice = db.query(models.Invoice).filter(models.Invoice.invoice_id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    try:
+        new_status_enum = models.DocumentStatus(request.new_status)
+    except ValueError:
+        valid_statuses = [s.value for s in models.DocumentStatus]
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status '{request.new_status}'. Valid statuses are: {valid_statuses}"
+        )
+
+    old_status = invoice.status
+    invoice.status = new_status_enum
+    
+    # NEW: Set paid_date when moving to 'paid' status
+    if new_status_enum == models.DocumentStatus.paid:
+        invoice.paid_date = datetime.utcnow().date()
+    
+    # THE LEARNING TRIGGER: If an invoice that needed review is now approved, learn from it.
+    if old_status == models.DocumentStatus.needs_review and new_status_enum == models.DocumentStatus.approved_for_payment:
+        print(f"🧠 Learning from manual approval of invoice {invoice.invoice_id}...")
+        _learn_from_manual_approval(db, invoice)
+    
+    # Create an audit log entry
+    audit_log = models.AuditLog(
+        entity_type='Invoice',
+        entity_id=invoice.invoice_id,
+        user='System', # In a real app, this would be the logged-in user
+        action='Status Changed',
+        details={'from': old_status.value, 'to': new_status_enum.value, 'reason': request.reason}
+    )
+    db.add(audit_log)
+
+    db.commit()
+    return {"message": f"Invoice {invoice_id} status updated to '{request.new_status}' successfully."}
+
+@router.get("/{invoice_id}/dossier")
+def get_invoice_dossier(invoice_id: str, db: Session = Depends(get_db)):
+    """
+    Retrieves and formats a complete "dossier" for an invoice, including all
+    related documents (PO, GRN), their raw data, and file paths for display.
+    This is the primary endpoint for viewing a document and its context.
+    """
+    invoice = db.query(models.Invoice).filter(models.Invoice.invoice_id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # The formatting logic is now more complex and lives in the data_formatting utility
+    formatted_dossier = data_formatting.format_full_dossier(invoice, db)
+    
+    return formatted_dossier
+
+def _learn_from_manual_approval(db: Session, invoice: models.Invoice):
+    """
+    Analyzes a manually approved invoice to create or update a LearnedHeuristic.
+    This now reads from the match_trace field.
+    """
+    # We only learn from invoices that have a match trace
+    if not invoice.match_trace or not invoice.vendor_name:
+        return
+
+    # Find the first failed step in the trace to learn from
+    first_failure = next((step for step in invoice.match_trace if step.get("status") == "FAIL"), None)
+
+    if not first_failure:
+        return # No failure to learn from
+    
+    failure_details = first_failure.get("details", {})
+    failure_step = first_failure.get("step", "")
+    
+    learned_condition = {}
+    exception_type = "" # We'll derive this from the step name
+
+    if "Price Match" in failure_step:
+        exception_type = "PriceMismatchException"
+        invoice_price = failure_details.get("invoice_price", 0)
+        po_price = failure_details.get("po_price", 0)
+        if po_price > 0:
+            variance = abs(invoice_price - po_price) / po_price * 100
+            learned_condition = {"max_variance_percent": math.ceil(variance)}
+    elif "Quantity Match" in failure_step:
+        exception_type = "QuantityMismatchException"
+        invoice_qty = failure_details.get("invoice_qty", 0)
+        # Check if it was compared to GRN or PO
+        grn_qty = failure_details.get("grn_qty")
+        po_qty = failure_details.get("po_qty")
+        if grn_qty is not None:
+             learned_condition = {"max_quantity_diff": abs(invoice_qty - grn_qty)}
+        elif po_qty is not None:
+             learned_condition = {"max_quantity_diff": abs(invoice_qty - po_qty)}
+
+    if not exception_type or not learned_condition:
+        return # Could not determine a learnable condition
+
+    # Check if a similar heuristic already exists
+    heuristic = db.query(models.LearnedHeuristic).filter_by(
+        vendor_name=invoice.vendor_name,
+        exception_type=exception_type,
+        learned_condition=learned_condition
+    ).first()
+
+    if heuristic:
+        # If it exists, strengthen it
+        heuristic.trigger_count += 1
+        # Confidence formula: approaches 1 as trigger_count increases
+        heuristic.confidence_score = 1.0 - (1.0 / (heuristic.trigger_count + 1))
+        print(f"✅ Strengthened heuristic for {invoice.vendor_name}: {exception_type}. New confidence: {heuristic.confidence_score:.2f}")
+    else:
+        # If not, create a new one
+        new_heuristic = models.LearnedHeuristic(
+            vendor_name=invoice.vendor_name,
+            exception_type=exception_type,
+            learned_condition=learned_condition,
+            resolution_action=models.DocumentStatus.approved_for_payment.value,
+            trigger_count=1,
+            confidence_score=0.5 # Start with a moderate confidence for a new rule
+        )
+        db.add(new_heuristic)
+        print(f"✅ Created new heuristic for {invoice.vendor_name}: {exception_type}") 
