@@ -145,7 +145,7 @@ export const LineItemComparisonTable = ({ comparisonData, onUpdate }: LineItemCo
                     <TableCell>
                         <Input
                             type="number"
-                            value={editedQty !== undefined ? editedQty : poLine.ordered_qty}
+                            value={editedQty !== undefined ? editedQty : poLine.ordered_qty ?? ''}
                             onChange={(e) => handleFieldChange(poLine.po_number, poLine.description, 'ordered_qty', e.target.value)}
                             className={cn("text-center h-8", isQtyEdited && "border-blue-primary ring-1 ring-blue-primary")}
                             disabled={!poLine.po_number}
@@ -155,7 +155,7 @@ export const LineItemComparisonTable = ({ comparisonData, onUpdate }: LineItemCo
                         <Input
                             type="number"
                             step="0.01"
-                            value={editedPrice !== undefined ? editedPrice : poLine.unit_price}
+                            value={editedPrice !== undefined ? editedPrice : poLine.unit_price ?? ''}
                             onChange={(e) => handleFieldChange(poLine.po_number, poLine.description, 'unit_price', e.target.value)}
                             className={cn("text-right h-8", isPriceEdited && "border-blue-primary ring-1 ring-blue-primary")}
                             disabled={!poLine.po_number}

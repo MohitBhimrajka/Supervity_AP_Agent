@@ -5,15 +5,18 @@ import dynamic from "next/dynamic";
 import { getDocumentFile } from "@/lib/api";
 import { Loader2, AlertCircle, FileQuestion } from "lucide-react";
 import { pdfjs } from 'react-pdf';
+// Add imports for CSS, which is best practice for react-pdf
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 
 // Dynamically import react-pdf components
 const Document = dynamic(() => import("react-pdf").then((mod) => mod.Document), { ssr: false });
 const Page = dynamic(() => import("react-pdf").then((mod) => mod.Page), { ssr: false });
 
-// --- START FIX: Correctly configure the PDF worker ---
-// This ensures the worker version matches the installed react-pdf version.
+// --- START FIX: Use a more robust worker configuration ---
+// This method uses the worker from node_modules directly, which is more reliable than a CDN.
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.mjs`;
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
 }
 // --- END FIX ---
 
