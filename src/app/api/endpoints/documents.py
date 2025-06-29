@@ -8,6 +8,9 @@ import os
 from app.api.dependencies import get_db
 from app.db import models, schemas
 from app.core import background_tasks as tasks_service
+# ADD THIS IMPORT
+from app.modules.matching import engine as matching_engine
+from sqlalchemy.orm import joinedload
 
 router = APIRouter()
 
@@ -124,4 +127,57 @@ def search_invoices_flexible(request: schemas.SearchRequest, db: Session = Depen
             query = query.filter(column.isnot(None))
         # Add more operators as needed
         
-    return query.order_by(models.Invoice.invoice_date.desc()).all() 
+            return query.order_by(models.Invoice.invoice_date.desc()).all()
+
+
+# ADD THIS NEW ENDPOINT
+@router.put("/purchase-orders/{po_db_id}")
+def update_purchase_order(
+    po_db_id: int, 
+    changes: Dict[str, Any],
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Updates a Purchase Order's details and triggers a re-match for all
+    related invoices.
+    """
+    po = db.query(models.PurchaseOrder).options(
+        joinedload(models.PurchaseOrder.invoices)
+    ).filter(models.PurchaseOrder.id == po_db_id).first()
+
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase Order not found")
+
+    # Update the PO object
+    for key, value in changes.items():
+        if hasattr(po, key):
+            setattr(po, key, value)
+    
+    # Also update the raw_data_payload to ensure PDF regeneration is accurate
+    if po.raw_data_payload:
+        for key, value in changes.items():
+            if key in po.raw_data_payload:
+                po.raw_data_payload[key] = value
+
+    # Log the action
+    audit_log = models.AuditLog(
+        entity_type='PurchaseOrder',
+        entity_id=str(po.id),
+        user='System', # Should be replaced with actual user from auth
+        action='Updated from Workbench',
+        details={'changes': changes}
+    )
+    db.add(audit_log)
+    
+    # Find all related invoices to rematch
+    invoices_to_rematch = po.invoices
+    
+    db.commit() # Commit the PO changes first
+    
+    # Trigger a background task to re-run matching for all affected invoices
+    for inv in invoices_to_rematch:
+        background_tasks.add_task(matching_engine.run_match_for_invoice, db, inv.id)
+
+    db.refresh(po)
+    return {"message": "Purchase Order updated. Rematching related invoices in the background.", "po": schemas.PurchaseOrder.from_orm(po)} 

@@ -8,11 +8,12 @@ import { Button } from "../ui/Button";
 
 interface InvoiceListProps {
     selectedInvoiceId: string | null;
-    onInvoiceSelect: (invoiceId: string) => void;
+    onInvoiceSelect: (invoice: Invoice) => void;
     refreshKey?: number;
+    initialInvoiceId?: string | null;
 }
 
-export const InvoiceList = ({ selectedInvoiceId, onInvoiceSelect, refreshKey }: InvoiceListProps) => {
+export const InvoiceList = ({ selectedInvoiceId, onInvoiceSelect, refreshKey, initialInvoiceId }: InvoiceListProps) => {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState("needs_review");
@@ -23,6 +24,14 @@ export const InvoiceList = ({ selectedInvoiceId, onInvoiceSelect, refreshKey }: 
             try {
                 const data = await getInvoices(statusFilter);
                 setInvoices(data);
+
+                if (initialInvoiceId && data.length > 0) {
+                    const invoiceToSelect = data.find(inv => inv.invoice_id === initialInvoiceId);
+                    if (invoiceToSelect) {
+                        onInvoiceSelect(invoiceToSelect);
+                    }
+                }
+
             } catch (error) {
                 console.error(error);
             } finally {
@@ -30,7 +39,7 @@ export const InvoiceList = ({ selectedInvoiceId, onInvoiceSelect, refreshKey }: 
             }
         };
         fetchInvoices();
-    }, [statusFilter, refreshKey]);
+    }, [statusFilter, refreshKey, initialInvoiceId, onInvoiceSelect]);
 
     return (
         <div className="flex flex-col h-full">
@@ -52,7 +61,7 @@ export const InvoiceList = ({ selectedInvoiceId, onInvoiceSelect, refreshKey }: 
                 ) : (
                     <ul className="p-2 space-y-2">
                         {invoices.map(invoice => (
-                            <li key={invoice.invoice_id} onClick={() => onInvoiceSelect(invoice.invoice_id)}
+                            <li key={invoice.invoice_id} onClick={() => onInvoiceSelect(invoice)}
                                 className={cn(
                                     "p-3 rounded-lg cursor-pointer border transition-colors",
                                     selectedInvoiceId === invoice.invoice_id

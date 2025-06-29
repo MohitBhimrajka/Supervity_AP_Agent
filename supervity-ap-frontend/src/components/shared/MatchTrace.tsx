@@ -1,4 +1,5 @@
 import { CheckCircle2, XCircle, AlertTriangle, Info } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface TraceStep {
     step: string;
@@ -28,14 +29,17 @@ export const MatchTrace = ({ trace }: { trace: TraceStep[] }) => {
     return (
         <div className="space-y-4">
             <h4 className="font-semibold text-gray-900">Match Trace</h4>
-            <ul className="space-y-3">
+            <ul className="space-y-1">
                 {trace.map((step, index) => (
-                    <li key={index} className="flex items-start gap-3">
+                    <li key={index} className={cn(
+                        "flex items-start gap-3 p-2 rounded-md",
+                        step.status === 'FAIL' && "bg-pink-destructive/10 border-l-4 border-pink-destructive"
+                    )}>
                         <div className="flex-shrink-0 mt-1">
                             <StatusIcon status={step.status} />
                         </div>
                         <div>
-                            <p className={`font-medium text-gray-800 ${step.status === 'FAIL' ? 'text-pink-destructive' : ''}`}>
+                            <p className={`font-medium ${step.status === 'FAIL' ? 'text-pink-destructive' : 'text-gray-800'}`}>
                                 {step.step}
                             </p>
                             <p className="text-sm text-gray-500">{step.message}</p>

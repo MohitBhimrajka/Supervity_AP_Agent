@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FileUp, GanttChartSquare, Bot, Route, Cog } from "lucide-react";
+import { LayoutDashboard, FileUp, GanttChartSquare, Bot, Route, Cog, Banknote } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -12,6 +12,7 @@ const navItems = [
   { href: "/super-agent", icon: Bot, label: "Super Agent" },
   { href: "/invoice-explorer", icon: Route, label: "Invoice Explorer" },
   { href: "/ai-policy", icon: Cog, label: "AI Policy" },
+  { href: "/payment-proposal", icon: Banknote, label: "Payment Proposal" },
 ];
 
 export const Sidebar = () => {

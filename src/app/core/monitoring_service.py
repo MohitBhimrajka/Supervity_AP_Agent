@@ -2,7 +2,6 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 
 from app.db import models
-from app.db.session import SessionLocal
 
 def _create_notification_if_not_exists(db: Session, type: str, message: str, entity_id: str, entity_type: str, action: dict = None):
     """Prevents creating duplicate notifications."""
@@ -72,13 +71,12 @@ def check_for_financial_optimizations(db: Session):
         message = f"Early payment discount of ${inv.discount_amount or 0:,.2f} for Invoice {inv.invoice_id} is expiring on {inv.discount_due_date}. Pay now to capture it."
         _create_notification_if_not_exists(db, "Optimization", message, inv.invoice_id, "Invoice")
 
-def run_monitoring_cycle():
+def run_monitoring_cycle(db: Session):
     """
     The main entry point for the proactive engine's check-up.
     This function is called periodically by the background scheduler.
     """
     print("--- 🧠 Running Proactive Monitoring Cycle ---")
-    db = SessionLocal()
     try:
         check_for_automation_suggestions(db)
         check_for_financial_optimizations(db)
@@ -87,6 +85,4 @@ def run_monitoring_cycle():
     except Exception as e:
         print(f"❌ Error during monitoring cycle: {e}")
         db.rollback()
-    finally:
-        db.close()
     print("--- ✅ Monitoring Cycle Complete ---") 

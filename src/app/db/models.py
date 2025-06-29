@@ -8,6 +8,16 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
+class InvoicePurchaseOrderAssociation(Base):
+    __tablename__ = 'invoice_po_association'
+    invoice_id = Column(Integer, ForeignKey('invoices.id'), primary_key=True)
+    po_id = Column(Integer, ForeignKey('purchase_orders.id'), primary_key=True)
+
+class InvoiceGRNAssociation(Base):
+    __tablename__ = 'invoice_grn_association'
+    invoice_id = Column(Integer, ForeignKey('invoices.id'), primary_key=True)
+    grn_id = Column(Integer, ForeignKey('goods_receipt_notes.id'), primary_key=True)
+
 class DocumentStatus(str, enum.Enum):
     # Initial states
     pending_ingestion = "pending_ingestion"
@@ -132,6 +142,10 @@ class PurchaseOrder(Base):
     # --- FIX END ---
     file_path = Column(String, nullable=True)
     grns = relationship("GoodsReceiptNote", back_populates="po")
+    
+    # ADD THIS LINE:
+    invoices = relationship("Invoice", secondary="invoice_po_association", back_populates="purchase_orders")
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -139,12 +153,17 @@ class GoodsReceiptNote(Base):
     __tablename__ = "goods_receipt_notes"
     id = Column(Integer, primary_key=True, index=True)
     grn_number = Column(String, unique=True, index=True, nullable=False)
-    po_number = Column(String, ForeignKey("purchase_orders.po_number"), nullable=False)
+    po_number = Column(String, ForeignKey("purchase_orders.po_number"), nullable=True)
     received_date = Column(Date, nullable=True)
     line_items = Column(JSON, nullable=True)
     file_path = Column(String, nullable=True) # For linking to the original PDF
     po = relationship("PurchaseOrder", back_populates="grns")
-    invoices = relationship("Invoice", back_populates="grn")
+    
+    # MODIFY THIS LINE:
+    # from: invoices = relationship("Invoice", back_populates="grn")
+    # to:
+    invoices = relationship("Invoice", secondary="invoice_grn_association", back_populates="grns")
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -154,8 +173,16 @@ class Invoice(Base):
     invoice_id = Column(String, unique=True, index=True, nullable=False)
     vendor_name = Column(String)
     buyer_name = Column(String)
-    po_number = Column(String, index=True, nullable=True)
-    grn_number = Column(String, ForeignKey("goods_receipt_notes.grn_number"), index=True, nullable=True)
+    
+    # REMOVE THESE TWO LINES:
+    # po_number = Column(String, index=True, nullable=True)
+    # grn_number = Column(String, ForeignKey("goods_receipt_notes.grn_number"), index=True, nullable=True)
+    
+    # ADD THIS NEW FIELD for line-item level PO numbers:
+    # This stores an array of PO numbers found on the invoice for easy lookup
+    # without needing to join tables every time.
+    related_po_numbers = Column(JSON, nullable=True)
+    
     invoice_date = Column(Date, nullable=True)
     due_date = Column(Date, nullable=True)
     subtotal = Column(Float, nullable=True)
@@ -171,8 +198,14 @@ class Invoice(Base):
     
     status = Column(Enum(DocumentStatus), default=DocumentStatus.pending_match, nullable=False)
     ai_recommendation = Column(JSON, nullable=True)
-    file_path = Column(String, nullable=True) # For linking to the original PDF
+    file_path = Column(String, nullable=True)
     
+    # ADD THIS NEW FIELD for user notes:
+    notes = Column(String, nullable=True)
+    
+    # NEW FIELD for Non-PO invoices:
+    gl_code = Column(String, nullable=True)
+
     # New fields for financial KPIs
     discount_terms = Column(String, nullable=True)
     discount_amount = Column(Float, nullable=True)
@@ -187,5 +220,21 @@ class Invoice(Base):
     job_id = Column(Integer, ForeignKey("jobs.id"), nullable=True)
     job = relationship("Job")
 
-    # Relationship to the linked GRN
-    grn = relationship("GoodsReceiptNote", back_populates="invoices") 
+    # REMOVE THIS RELATIONSHIP:
+    # grn = relationship("GoodsReceiptNote", back_populates="invoices")
+
+    # ADD THESE NEW RELATIONSHIPS:
+    purchase_orders = relationship("PurchaseOrder", secondary="invoice_po_association", back_populates="invoices")
+    grns = relationship("GoodsReceiptNote", secondary="invoice_grn_association", back_populates="invoices")
+
+
+# ADD THIS NEW CLASS AT THE END OF THE FILE
+class Comment(Base):
+    __tablename__ = "comments"
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    user = Column(String, default="System") # Should be linked to a User model in a real app
+    text = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    invoice = relationship("Invoice") 

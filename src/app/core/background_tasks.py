@@ -22,26 +22,27 @@ def get_thread_db_session():
 def process_single_document(job_id: int, file_info: Dict[str, Any]):
     """
     Process a single document in a worker thread.
-    Returns (success, po_number, filename) tuple.
+    Returns (success, po_numbers_list, filename) tuple.
     """
     file_content = file_info["content"]
     filename = file_info["filename"]
     
     try:
         with get_thread_db_session() as db:
-            # Process the document
-            success, po_number = ingestion_service.ingest_document(
+            # The function call is the same, but what it returns is different
+            success, po_numbers = ingestion_service.ingest_document(
                 db=db, 
                 job_id=job_id,
                 file_content=file_content,
                 filename=filename
             )
-            
-            return success, po_number, filename
+            # The name here is changed from po_number to po_numbers for clarity
+            return success, po_numbers, filename
             
     except Exception as e:
         print(f"Error processing file {filename}: {e}")
-        return False, None, filename
+        # Make sure to return a list-like structure for the PO numbers on failure
+        return False, [], filename
 
 def update_job_progress(job_id: int, processed_count: int):
     """Helper function to update job progress in database."""
@@ -88,13 +89,16 @@ def process_uploaded_documents(job_id: int, files_data: List[Dict[str, Any]]):
             
             for future in as_completed(futures):
                 try:
-                    success, po_number, filename = future.result()
+                    # MODIFY THIS LINE:
+                    success, po_numbers_list, filename = future.result()
                     processed_count += 1
                     
                     if success:
                         successful_files += 1
-                        if po_number:
-                            affected_pos_set.add(po_number)
+                        # MODIFY THIS BLOCK:
+                        if po_numbers_list:
+                            # Add all returned PO numbers to the set
+                            affected_pos_set.update(po_numbers_list)
                         print(f"✅ Successfully processed: {filename}")
                     else:
                         failed_files += 1
@@ -125,10 +129,25 @@ def process_uploaded_documents(job_id: int, files_data: List[Dict[str, Any]]):
         job.status = "matching"
         db.commit()
 
-        # Matching can also be parallelized, but keeping it simple for now
-        # since it's typically faster than document processing
-        for po_number in affected_pos_set:
-            matching_engine.run_match_for_po(db, po_number)
+        # --- REWORKED MATCHING TRIGGER ---
+        # Find all invoices that were created as part of this job
+        invoices_to_match = db.query(models.Invoice).filter(models.Invoice.job_id == job_id).all()
+        
+        print(f"Found {len(invoices_to_match)} invoices from this job to match.")
+
+        # Trigger the new invoice-centric matching engine for each one
+        for invoice in invoices_to_match:
+            try:
+                # We will create this function in the next step
+                matching_engine.run_match_for_invoice(db, invoice.id)
+            except Exception as e:
+                print(f"  [ERROR] Matching failed for Invoice ID {invoice.id}: {e}")
+                # Optionally update the invoice status to an error state
+                invoice.status = models.DocumentStatus.needs_review
+                invoice.match_trace = [{"step": "Engine Error", "status": "FAIL", "message": str(e)}]
+                db.commit()
+        
+        # --- END REWORKED MATCHING TRIGGER ---
         
         # --- 3. Finalize Job ---
         job.status = "completed"

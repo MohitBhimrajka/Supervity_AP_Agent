@@ -8,8 +8,18 @@ import math
 from app.api.dependencies import get_db
 from app.db import models, schemas
 from app.utils import data_formatting
+# ADD THIS NEW IMPORT
+from app.modules.matching import comparison as comparison_service
+from pydantic import BaseModel
 
 router = APIRouter()
+
+# ADD THIS SCHEMA FOR THE REQUEST BODY
+class UpdateNoteRequest(BaseModel):
+    notes: str
+
+class UpdateGLCodeRequest(BaseModel):
+    gl_code: str
 
 @router.get("/", response_model=List[schemas.Invoice])
 def get_invoices(status: Optional[str] = None, db: Session = Depends(get_db)):
@@ -183,4 +193,61 @@ def _learn_from_manual_approval(db: Session, invoice: models.Invoice):
             confidence_score=0.5 # Start with a moderate confidence for a new rule
         )
         db.add(new_heuristic)
-        print(f"✅ Created new heuristic for {invoice.vendor_name}: {exception_type}") 
+        print(f"✅ Created new heuristic for {invoice.vendor_name}: {exception_type}")
+
+
+# ADD THIS ENTIRE NEW ENDPOINT AT THE END OF THE FILE
+@router.get("/{invoice_db_id}/comparison-data")
+def get_invoice_comparison_data(invoice_db_id: int, db: Session = Depends(get_db)):
+    """
+    Retrieves and prepares all data needed for the interactive workbench
+    comparison view for a single invoice.
+    """
+    data = comparison_service.prepare_comparison_data(db, invoice_db_id)
+    if "error" in data:
+        raise HTTPException(status_code=404, detail=data["error"])
+    return data
+
+# ADD THIS NEW ENDPOINT
+@router.put("/{invoice_db_id}/notes")
+def update_invoice_notes(
+    invoice_db_id: int,
+    request: UpdateNoteRequest,
+    db: Session = Depends(get_db)
+):
+    """Updates the notes field for a given invoice."""
+    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_db_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    invoice.notes = request.notes
+    db.commit()
+    
+    return {"message": "Notes updated successfully."}
+
+@router.put("/{invoice_db_id}/gl-code")
+def update_invoice_gl_code(
+    invoice_db_id: int,
+    request: UpdateGLCodeRequest,
+    db: Session = Depends(get_db)
+):
+    """Updates the GL code for a given invoice."""
+    invoice = db.query(models.Invoice).filter(models.Invoice.id == invoice_db_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    invoice.gl_code = request.gl_code
+    db.commit()
+    
+    # Log the action
+    audit_log = models.AuditLog(
+        entity_type='Invoice',
+        entity_id=invoice.invoice_id,
+        user='System',
+        action='GL Code Applied',
+        details={'gl_code': request.gl_code}
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {"message": "GL Code updated successfully."} 

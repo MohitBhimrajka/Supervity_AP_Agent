@@ -16,6 +16,7 @@ class InvoiceBase(BaseModel):
     invoice_id: str
     vendor_name: Optional[str] = None
     buyer_name: Optional[str] = None
+    related_po_numbers: Optional[List[str]] = None
     po_number: Optional[str] = None
     grn_number: Optional[str] = None
     invoice_date: Optional[date] = None
@@ -24,6 +25,7 @@ class InvoiceBase(BaseModel):
     tax: Optional[float] = None
     grand_total: Optional[float] = None
     line_items: Optional[List[LineItem]] = None
+    gl_code: Optional[str] = None
 
 class PurchaseOrderBase(BaseModel):
     po_number: str
@@ -34,7 +36,7 @@ class PurchaseOrderBase(BaseModel):
 
 class GoodsReceiptNoteBase(BaseModel):
     grn_number: str
-    po_number: str
+    po_number: Optional[str] = None
     received_date: Optional[date] = None
     line_items: Optional[List[Any]] = None
 
@@ -203,6 +205,21 @@ class AutomationRuleCreate(AutomationRuleBase):
 
 class AutomationRule(AutomationRuleBase):
     id: int
+    
+    class Config:
+        from_attributes = True
+
+# ADD THESE NEW SCHEMAS
+class CommentBase(BaseModel):
+    text: str
+    user: Optional[str] = "System"
+
+class CommentCreate(CommentBase):
+    pass
+
+class Comment(CommentBase):
+    id: int
+    created_at: datetime
     
     class Config:
         from_attributes = True 

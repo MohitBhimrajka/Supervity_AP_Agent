@@ -9,7 +9,9 @@ def format_invoice_dossier_for_display(invoice: models.Invoice) -> dict:
     if not invoice:
         return {}
 
-    po = invoice.grn.po if invoice.grn else None
+    # Use the new many-to-many relationships
+    grn = invoice.grns[0] if invoice.grns else None
+    po = grn.po if grn else None
     
     formatted_exceptions = []
     if invoice.status == models.DocumentStatus.needs_review and invoice.exception_details:
@@ -35,7 +37,7 @@ def format_invoice_dossier_for_display(invoice: models.Invoice) -> dict:
         },
         "linked_documents": {
             "PO Number": po.po_number if po else "N/A",
-            "GRN Number": invoice.grn.grn_number if invoice.grn else "N/A",
+            "GRN Number": grn.grn_number if grn else "N/A",
         },
         "exceptions": formatted_exceptions,
         "raw_data": schemas.Invoice.from_orm(invoice).model_dump() # Keep raw data for expander
@@ -50,16 +52,21 @@ def format_full_dossier(invoice: models.Invoice, db: Session) -> dict:
     if not invoice:
         return {}
 
-    # --- Data Gathering ---
-    grn = invoice.grn
+    # --- START FIX: Correctly gather related documents ---
+    # Use the new many-to-many relationships
+    
+    # Take the first related documents for the dossier view.
+    # In a real-world multi-document scenario, the UI would need a way to select which to view.
+    grn = invoice.grns[0] if invoice.grns else None
     po = None
 
     # Find PO through GRN first (most common path)
     if grn and grn.po:
         po = grn.po
     # Fallback to direct PO link on invoice if no GRN or GRN->PO link
-    elif invoice.po_number:
-        po = db.query(models.PurchaseOrder).filter(models.PurchaseOrder.po_number == invoice.po_number).first()
+    elif invoice.purchase_orders:
+        po = invoice.purchase_orders[0]
+    # --- END FIX ---
     
     # --- MODIFIED SECTION ---
     # Parse the new match_trace instead of exception_details

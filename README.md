@@ -87,21 +87,51 @@ The heart of the system is the AP Copilot. It's designed to understand the conte
      ```
 
 ### 4. Running the Server
+
+#### Option A: Fresh Start (Recommended for Development)
+   - Use the fresh start script to clean the database, initialize config, and run the server:
+     ```bash
+     python run_fresh.py
+     ```
+     or
+     ```bash
+     ./run_fresh.sh
+     ```
+   - For a complete database reset (drop and recreate tables):
+     ```bash
+     python run_fresh.py --reset
+     ```
+
+#### Option B: Standard Start
    - Execute the run script:
      ```bash
      python run.py
      ```
+
    - The API will be available at `http://127.0.0.1:8000`.
    - Interactive API documentation (via Swagger UI) is available at `http://127.0.0.1:8000/docs`.
 
 ## 🧪 Testing the System (Quickstart)
 
+### Method 1: Using Fresh Start (Recommended)
+1.  **Start fresh** (cleans DB, initializes config, and starts server):
+    ```bash
+    python run_fresh.py
+    ```
+2.  **Generate sample data:**
+    ```bash
+    python scripts/data_generator.py
+    ```
+
+### Method 2: Manual Setup
 1.  **Reset the database** as shown above.
 2.  **Generate sample data:**
     ```bash
     python scripts/data_generator.py
     ```
 3.  **Start the application** with `python run.py`.
+
+### Next Steps (Both Methods)
 4.  **Upload documents:**
     - Go to the API docs at `http://127.0.0.1:8000/docs`.
     - Use the `POST /api/documents/upload` endpoint to upload all the PDF files from the `sample_data/arcelormittal_documents` directory.

@@ -497,6 +497,63 @@ def create_test_set_10_timing_issues():
     # Invoice dated before GRN
     draw_invoice_pdf(invoice_data, invoice_number, datetime(2024, 2, 20), datetime(2024, 3, 22), f"{OUTPUT_DIR}/Set10_{invoice_number}_for_GRN_GRN-84011.pdf")
 
+def create_test_set_11_multi_po_invoice():
+    """Test Set 11: A single invoice covering items from two different POs."""
+    print("Creating Set 11: Multi-PO Invoice...")
+
+    # --- PO #1 Data ---
+    po1_data = {
+        "buyer_name": "Multi-System Builders",
+        "buyer_address": "101 Integration Ave\nSan Francisco, CA 94105",
+        "vendor_name": "ArcelorMittal",
+        "vendor_address": "24-26, Boulevard d'Avranches\nL-1160 Luxembourg",
+        "po_number": "PO-78011",
+        "order_date": datetime(2024, 3, 10),
+        "line_items": [
+            {"sku": "AM-SB-001", "description": "Steel Beam", "ordered_qty": 20, "unit": "pieces", "unit_price": 55.00, "line_total": 1100.00}
+        ],
+        "po_subtotal": 1100.00, "po_tax": 88.00, "po_grand_total": 1188.00
+    }
+    draw_po_pdf(po1_data, f"{OUTPUT_DIR}/Set11_PO-78011.pdf")
+    
+    # --- PO #2 Data ---
+    po2_data = {
+        "buyer_name": "Multi-System Builders",
+        "buyer_address": "101 Integration Ave\nSan Francisco, CA 94105",
+        "vendor_name": "ArcelorMittal",
+        "vendor_address": "24-26, Boulevard d'Avranches\nL-1160 Luxembourg",
+        "po_number": "PO-78012",
+        "order_date": datetime(2024, 3, 12),
+        "line_items": [
+            {"sku": "AM-RP-002", "description": "Rivet Pack", "ordered_qty": 50, "unit": "pieces", "unit_price": 6.00, "line_total": 300.00}
+        ],
+        "po_subtotal": 300.00, "po_tax": 24.00, "po_grand_total": 324.00
+    }
+    draw_po_pdf(po2_data, f"{OUTPUT_DIR}/Set11_PO-78012.pdf")
+
+    # --- Consolidated Invoice Data ---
+    invoice_number = "INV-AM-98013"
+    consolidated_invoice_data = {
+        "buyer_name": "Multi-System Builders",
+        "buyer_address": "101 Integration Ave\nSan Francisco, CA 94105",
+        "vendor_name": "ArcelorMittal",
+        "vendor_address": "24-26, Boulevard d'Avranches\nL-1160 Luxembourg",
+        # CRITICAL: This invoice references both POs.
+        "related_po_numbers": ["PO-78011", "PO-78012"],
+        "related_grn_numbers": [], # Assuming no GRN for simplicity
+        "line_items": [
+            # Item from PO1, note the line-item specific po_number
+            {"description": "Steel Beam", "billed_qty": 20, "unit_price": 55.00, "total": 1100.00, "po_number": "PO-78011"},
+            # Item from PO2
+            {"description": "Rivet Pack", "billed_qty": 50, "unit_price": 6.00, "total": 300.00, "po_number": "PO-78012"},
+        ],
+        "subtotal": 1400.00,
+        "tax": 112.00,
+        "grand_total": 1512.00
+    }
+    # The filename doesn't need to reference the POs, but the content does.
+    draw_invoice_pdf(consolidated_invoice_data, invoice_number, datetime(2024, 3, 20), datetime(2024, 4, 19), f"{OUTPUT_DIR}/Set11_{invoice_number}_for_MultiPO.pdf")
+
 def main():
     """Generate all 10 test sets"""
     print("🧪 COMPREHENSIVE AP AUTOMATION TEST DATA GENERATOR")
@@ -516,6 +573,7 @@ def main():
     create_test_set_8_currency_mismatch()
     create_test_set_9_multi_line_complex()
     create_test_set_10_timing_issues()
+    create_test_set_11_multi_po_invoice()
     
     print("\n" + "=" * 60)
     print("✅ TEST DATA GENERATION COMPLETE!")
@@ -537,6 +595,7 @@ def main():
     print("  8. Currency/Unit Conversion Issues")
     print("  9. Complex Multi-Line with Mixed Issues")
     print(" 10. Timing and Workflow Issues")
+    print(" 11. Multi-PO Invoice")
     
     print("\n🔄 Next Steps:")
     print("1. Run: python cleanup_db.py (in Tungsten_AP_Agent directory)")
@@ -546,7 +605,7 @@ def main():
     
     print("\n💡 Expected Results:")
     print("  ✅ Set 1: All matched, no exceptions")
-    print("  ❌ Sets 2-10: Various exceptions for testing AI diagnosis")
+    print("  ❌ Sets 2-11: Various exceptions for testing AI diagnosis")
 
 if __name__ == "__main__":
     main() 

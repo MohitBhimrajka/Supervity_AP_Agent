@@ -28,7 +28,9 @@ Your JSON output MUST conform to one of the following schemas:
 {"document_type": "Goods Receipt Note", "grn_number": "string", "po_number": "string", "received_date": "YYYY-MM-DD", "line_items": [{"description": "string", "received_qty": float, "sku": "string | null"}]}
 
 3. If Vendor Invoice:
-{"document_type": "Invoice", "invoice_id": "string", "vendor_name": "string", "po_number": "string | null", "grn_number": "string | null", "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "line_items": [{"description": "string", "quantity": float, "unit_price": float, "line_total": float, "sku": "string | null"}], "subtotal": float, "tax": float, "grand_total": float, "discount_terms": "string | null", "discount_amount": float | null, "discount_due_date": "YYYY-MM-DD | null"}"""
+{"document_type": "Invoice", "invoice_id": "string", "vendor_name": "string", "related_po_numbers": ["string"], "related_grn_numbers": ["string"], "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "line_items": [{"description": "string", "quantity": float, "unit_price": float, "line_total": float, "sku": "string | null", "po_number": "string | null"}], "subtotal": float, "tax": float, "grand_total": float, "discount_terms": "string | null", "discount_amount": float | null, "discount_due_date": "YYYY-MM-DD | null"}
+
+IMPORTANT: For Invoices, extract all PO numbers and GRN numbers you can find in the document into the `related_po_numbers` and `related_grn_numbers` arrays. If a specific line item references a PO number, extract it into the `po_number` field for that line item."""
 
 def extract_data_from_pdf(pdf_content: bytes) -> Optional[Dict]:
     """

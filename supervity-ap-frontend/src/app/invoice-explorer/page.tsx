@@ -74,7 +74,7 @@ export default function InvoiceExplorerPage() {
                                 <TableHead>Vendor</TableHead>
                                 <TableHead>Date</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>PO / GRN</TableHead>
+                                <TableHead>Related POs</TableHead>
                                 <TableHead className="text-right">Total</TableHead>
                                 <TableHead className="text-center">Action</TableHead>
                             </TableRow>
@@ -98,8 +98,10 @@ export default function InvoiceExplorerPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-sm text-gray-800 font-medium">
-                                            <div>{inv.po_number || 'N/A'}</div>
-                                            <div>{inv.grn_number || 'N/A'}</div>
+                                            <div>PO: {inv.related_po_numbers && inv.related_po_numbers.length > 0 ? inv.related_po_numbers[0] : 'N/A'}</div>
+                                            {inv.related_po_numbers && inv.related_po_numbers.length > 1 && (
+                                                <div className="text-xs text-gray-500">+{inv.related_po_numbers.length - 1} more</div>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right font-medium">${inv.grand_total?.toFixed(2)}</TableCell>
                                         <TableCell className="text-center">

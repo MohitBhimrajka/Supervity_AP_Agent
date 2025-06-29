@@ -2,36 +2,27 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { getDocumentFile, type Dossier } from "@/lib/api";
-import { Button } from "../ui/Button";
-import { Loader2, AlertCircle } from "lucide-react";
+import { getDocumentFile } from "@/lib/api";
+import { Loader2, AlertCircle, FileQuestion } from "lucide-react";
+import { pdfjs } from 'react-pdf';
 
-// Dynamically import react-pdf components to avoid SSR issues
-const Document = dynamic(
-  () => import("react-pdf").then((mod) => mod.Document),
-  { ssr: false }
-);
+// Dynamically import react-pdf components
+const Document = dynamic(() => import("react-pdf").then((mod) => mod.Document), { ssr: false });
+const Page = dynamic(() => import("react-pdf").then((mod) => mod.Page), { ssr: false });
 
-const Page = dynamic(
-  () => import("react-pdf").then((mod) => mod.Page),
-  { ssr: false }
-);
-
-// Configure PDF.js worker only on client side
+// --- START FIX: Correctly configure the PDF worker ---
+// This ensures the worker version matches the installed react-pdf version.
 if (typeof window !== 'undefined') {
-  import("react-pdf").then((mod) => {
-    mod.pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${mod.pdfjs.version}/build/pdf.worker.min.js`;
-  });
+  pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.mjs`;
 }
+// --- END FIX ---
 
-type DocType = 'invoice' | 'grn' | 'po';
-
+// Define a simpler prop type
 interface DocumentViewerProps {
-  dossier: Dossier | null;
+  filePath: string | null;
 }
 
-export const DocumentViewer = ({ dossier }: DocumentViewerProps) => {
-  const [activeDocType, setActiveDocType] = useState<DocType>('invoice');
+export const DocumentViewer = ({ filePath }: DocumentViewerProps) => {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,18 +35,14 @@ export const DocumentViewer = ({ dossier }: DocumentViewerProps) => {
 
   useEffect(() => {
     const loadDocument = async () => {
-      if (!dossier) return;
-
-      const doc = dossier.documents[activeDocType];
-      if (doc && doc.file_path) {
+      if (filePath) {
         setIsLoading(true);
         setError(null);
         try {
-          const url = await getDocumentFile(doc.file_path);
+          const url = await getDocumentFile(filePath);
           setFileUrl(url);
         } catch (err) {
-          console.error(err);
-          setError(`Could not load ${activeDocType.toUpperCase()}.`);
+          setError("Could not load document.");
           setFileUrl(null);
         } finally {
           setIsLoading(false);
@@ -65,74 +52,31 @@ export const DocumentViewer = ({ dossier }: DocumentViewerProps) => {
         setError(null);
       }
     };
-
-    loadDocument();
-
+    if(isMounted) {
+      loadDocument();
+    }
+    
     // Cleanup blob URL on component unmount or when doc changes
     return () => {
       if (fileUrl) {
         URL.revokeObjectURL(fileUrl);
       }
     };
-  }, [dossier, activeDocType, fileUrl]);
+  }, [filePath, isMounted]);
 
-  if (!dossier) {
-    return (
-              <div className="p-4 h-full flex items-center justify-center text-gray-800">
-        <p>Select an invoice to view its documents.</p>
-      </div>
-    );
-  }
+  if (!isMounted) return null; // Prevent rendering on server
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 p-2 border-b flex gap-2">
-        <Button
-          size="sm"
-          variant={activeDocType === 'invoice' ? 'primary' : 'secondary'}
-          onClick={() => setActiveDocType('invoice')}
-        >
-          Invoice
-        </Button>
-        <Button
-          size="sm"
-          variant={activeDocType === 'grn' ? 'primary' : 'secondary'}
-          onClick={() => setActiveDocType('grn')}
-          disabled={!dossier.documents.grn?.file_path}
-        >
-          GRN
-        </Button>
-        <Button
-          size="sm"
-          variant={activeDocType === 'po' ? 'primary' : 'secondary'}
-          onClick={() => setActiveDocType('po')}
-          disabled={!dossier.documents.po?.file_path}
-        >
-          PO
-        </Button>
-      </div>
-      {/* The scrolling container */}
-      <div className="flex-grow overflow-y-auto bg-gray-200 p-4 flex justify-center">
-        {isLoading && (
-                          <div className="h-full flex items-center justify-center text-gray-800"><Loader2 className="w-8 h-8 animate-spin" /></div>
-        )}
-        {error && (
-                          <div className="h-full flex flex-col items-center justify-center text-gray-800"><AlertCircle className="w-8 h-8 text-pink-destructive mb-2" /><p className="font-medium">{error}</p></div>
-        )}
-        {fileUrl && !isLoading && isMounted && (
-          // The Document component from react-pdf
-          <Document
-            file={fileUrl}
-            loading={<div className="flex items-center justify-center h-full"><Loader2 className="w-6 h-6 animate-spin"/></div>}
-            error={<div className="flex items-center justify-center h-full text-pink-destructive">Failed to load PDF.</div>}
-          >
-            <Page pageNumber={1} />
-          </Document>
-        )}
-        {!fileUrl && !isLoading && !error && (
-                      <div className="h-full flex items-center justify-center text-gray-800"><p className="font-medium">Document not available.</p></div>
-        )}
-      </div>
+    <div className="flex-grow overflow-y-auto bg-gray-200 p-4 flex justify-center">
+      {isLoading && <div className="h-full flex items-center justify-center text-gray-800"><Loader2 className="w-8 h-8 animate-spin" /></div>}
+      {error && <div className="h-full flex flex-col items-center justify-center text-pink-destructive"><AlertCircle className="w-8 h-8 mb-2" /><p className="font-medium">{error}</p></div>}
+      {fileUrl && !isLoading && <Document file={fileUrl} loading={<Loader2 className="w-6 h-6 animate-spin" />} error={<p>Failed to load PDF.</p>}><Page pageNumber={1} renderTextLayer={false} renderAnnotationLayer={false} /></Document>}
+      {!filePath && !isLoading && !error && (
+        <div className="h-full flex flex-col items-center justify-center text-gray-500">
+          <FileQuestion className="w-12 h-12 mb-2" />
+          <p className="font-medium">Document not available</p>
+        </div>
+      )}
     </div>
   );
 }; 
