@@ -212,6 +212,12 @@ class Invoice(Base):
     discount_due_date = Column(Date, nullable=True)
     paid_date = Column(Date, nullable=True)
     
+    # NEW: Timestamps for handling time calculation
+    review_started_at = Column(DateTime, nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    # New field to store handling time in minutes for easier querying
+    handling_time_minutes = Column(Integer, nullable=True)
+    
     # Timestamps for KPI calculation
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 
 from app.api.dependencies import get_db
@@ -88,6 +88,19 @@ def update_invoice_status_endpoint(
 
     old_status = invoice.status
     invoice.status = new_status_enum
+    
+    # --- START of new logic for handling time ---
+    if new_status_enum == models.DocumentStatus.needs_review and old_status != models.DocumentStatus.needs_review:
+        invoice.review_started_at = datetime.now(timezone.utc)
+        invoice.resolved_at = None
+        invoice.handling_time_minutes = None
+    
+    if old_status == models.DocumentStatus.needs_review and new_status_enum != models.DocumentStatus.needs_review:
+        invoice.resolved_at = datetime.now(timezone.utc)
+        if invoice.review_started_at:
+            time_delta = invoice.resolved_at - invoice.review_started_at
+            invoice.handling_time_minutes = int(time_delta.total_seconds() / 60)
+    # --- END of new logic ---
     
     # NEW: Set paid_date when moving to 'paid' status
     if new_status_enum == models.DocumentStatus.paid:

@@ -222,4 +222,20 @@ class Comment(CommentBase):
     created_at: datetime
     
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+# --- NEW DASHBOARD SCHEMAS ---
+
+class ExceptionSummaryItem(BaseModel):
+    name: str
+    count: int
+
+class CostRoiMetrics(BaseModel):
+    agent_expense: float
+    infra_cost_monthly: float
+    total_investment_todate: float
+    time_saved_value: float
+    discounts_captured_value: float
+    total_return_todate: float
+    ai_roi_todate: float
+    processed_invoice_count: int 

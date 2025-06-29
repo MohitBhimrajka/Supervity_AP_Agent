@@ -1,9 +1,16 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { type Kpis, getDashboardKpis, type Summary, getDashboardSummary } from '@/lib/api';
+import { 
+    type Kpis, getDashboardKpis, 
+    type Summary, getDashboardSummary, 
+    type ExceptionSummaryItem, getExceptionSummary,
+    type CostRoiMetrics, getCostRoiMetrics
+} from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { DollarSign, Zap, Clock, AlertCircle, TrendingUp, TrendingDown, FileInput, Filter, Check, Loader2 } from 'lucide-react';
+import { ExceptionChart } from '@/components/dashboard/ExceptionChart';
+import { CostRoiCard } from '@/components/dashboard/CostRoiCard';
 
 const KpiCard = ({ title, value, icon: Icon, change, changeType }: { title: string, value: string | number, icon: React.ElementType, change?: string, changeType?: 'up' | 'down' }) => (
     <Card>
@@ -38,13 +45,29 @@ const FunnelStep = ({ icon: Icon, title, value, colorClass }: { icon: React.Elem
 export default function DashboardPage() {
     const [kpis, setKpis] = useState<Kpis | null>(null);
     const [summary, setSummary] = useState<Summary | null>(null);
+    const [exceptionData, setExceptionData] = useState<ExceptionSummaryItem[] | null>(null);
+    const [costRoiData, setCostRoiData] = useState<CostRoiMetrics | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        getDashboardKpis().then(setKpis).catch(console.error);
-        getDashboardSummary().then(setSummary).catch(console.error);
+        setIsLoading(true);
+        Promise.all([
+            getDashboardKpis(),
+            getDashboardSummary(),
+            getExceptionSummary(),
+            getCostRoiMetrics()
+        ]).then(([kpisData, summaryData, exceptionData, costRoiData]) => {
+            setKpis(kpisData);
+            setSummary(summaryData);
+            setExceptionData(exceptionData);
+            setCostRoiData(costRoiData);
+        }).catch(error => {
+            console.error("Failed to load dashboard data:", error);
+            // Optionally, show a toast notification for the user
+        }).finally(() => setIsLoading(false));
     }, []);
 
-    if (!kpis || !summary) {
+    if (isLoading || !kpis || !summary || !exceptionData || !costRoiData) {
         return <div className="p-4 flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin" /></div>;
     }
     
@@ -70,9 +93,9 @@ export default function DashboardPage() {
     return (
         <div className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <KpiCard title="Touchless Rate" value={`${efficiencyData.touchless_invoice_rate_percent.toFixed(1)}%`} icon={Zap} change="+5.2% from last month" changeType="up"/>
-                <KpiCard title="Invoices in Review Queue" value={efficiencyData.invoices_in_review_queue} icon={AlertCircle} />
-                <KpiCard title="Avg. Payment Time" value={`${financialData.days_payable_outstanding_proxy.toFixed(1)} days`} icon={Clock} change="-1.5 days" changeType="down"/>
+                <KpiCard title="Touchless Rate" value={`${efficiencyData.touchless_invoice_rate_percent.toFixed(1)}%`} icon={Zap} />
+                <KpiCard title="Avg. Handling Time" value={`${efficiencyData.avg_exception_handling_time_hours.toFixed(1)} hrs`} icon={Clock} />
+                <KpiCard title="In Review" value={efficiencyData.invoices_in_review_queue} icon={AlertCircle} />
                 <KpiCard title="Discounts Captured" value={financialData.discounts_captured} icon={DollarSign} />
             </div>
             <Card>
@@ -87,6 +110,16 @@ export default function DashboardPage() {
                     <FunnelStep icon={AlertCircle} title="Flagged for Review" value={summary.requires_review} colorClass="bg-orange-warning" />
                 </CardContent>
             </Card>
+
+            <div className="grid gap-6 lg:grid-cols-5">
+                <div className="lg:col-span-2">
+                    <CostRoiCard data={costRoiData} />
+                </div>
+                <div className="lg:col-span-3">
+                    <ExceptionChart data={exceptionData} />
+                </div>
+            </div>
+
             <div className="grid gap-6 lg:grid-cols-5">
                 <Card className="lg:col-span-3">
                     <CardHeader>

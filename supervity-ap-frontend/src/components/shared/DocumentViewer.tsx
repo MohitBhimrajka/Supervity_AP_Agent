@@ -13,12 +13,11 @@ import 'react-pdf/dist/Page/TextLayer.css';
 const Document = dynamic(() => import("react-pdf").then((mod) => mod.Document), { ssr: false });
 const Page = dynamic(() => import("react-pdf").then((mod) => mod.Page), { ssr: false });
 
-// --- START FIX: Use a more robust worker configuration ---
-// This method uses the worker from node_modules directly, which is more reliable than a CDN.
+// Configure PDF.js worker for Next.js
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+  // Use CDN worker which is more reliable for Next.js
+  pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 }
-// --- END FIX ---
 
 // Define a simpler prop type
 interface DocumentViewerProps {
@@ -42,7 +41,8 @@ export const DocumentViewer = ({ filePath }: DocumentViewerProps) => {
         setIsLoading(true);
         setError(null);
         try {
-          const url = await getDocumentFile(filePath);
+          const blob = await getDocumentFile(filePath);
+          const url = URL.createObjectURL(blob);
           setFileUrl(url);
         } catch (err) {
           setError("Could not load document.");
