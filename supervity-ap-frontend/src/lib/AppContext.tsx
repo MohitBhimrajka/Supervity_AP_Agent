@@ -4,8 +4,9 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 // Define the shape of the data for the canvas
 interface CanvasData {
   title: string;
-  type: 'data' | 'copilot'; // Add type property
+  type: 'data' | 'copilot' | 'component'; // Add 'component' type
   data?: unknown; // Data is optional, not needed for copilot
+  content?: ReactNode; // Add 'content' for custom components
 }
 
 interface AppContextType {

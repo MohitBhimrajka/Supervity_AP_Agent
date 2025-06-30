@@ -96,13 +96,15 @@ export const ReviewResolveTab = ({ comparisonData, invoiceDbId, onDataUpdate, on
             />
         )}
         
+        {/* Always show line items. Comparison table will handle empty PO/GRN data gracefully. */}
+        <LineItemComparisonTable comparisonData={comparisonData} onUpdate={onDataUpdate} />
+
         {isNonPoInvoice ? (
-            <NonPoReview invoiceDbId={invoiceDbId} initialGlCode={comparisonData.gl_code} />
+          // If it's a Non-PO invoice, show the GL Code input field.
+          <NonPoReview invoiceDbId={invoiceDbId} initialGlCode={comparisonData.gl_code} />
         ) : (
-            <>
-                <LineItemComparisonTable comparisonData={comparisonData} onUpdate={onDataUpdate} />
-                <PoDetailsTable comparisonData={comparisonData} />
-            </>
+          // If it is a PO invoice, show the PO details table.
+          <PoDetailsTable comparisonData={comparisonData} />
         )}
         <div>
           <h3 className="text-lg font-semibold mb-2 text-black">Reference Notes</h3>

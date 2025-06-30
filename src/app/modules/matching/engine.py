@@ -5,13 +5,15 @@ import math
 
 from app.db import models
 from app.config import PRICE_TOLERANCE_PERCENT
+from app.utils.auditing import log_audit_event
 from .exceptions import *
 
 # This is the new entry point for the matching engine.
 def run_match_for_invoice(db: Session, invoice_db_id: int):
     """
-    Performs a comprehensive, INVOICE-centric 3-way match using normalized data.
-    This function is idempotent and can be run multiple times.
+    Performs a comprehensive, INVOICE-centric 3-way match. This function is idempotent and
+    is the single source of truth for changing an invoice's status from 'ingested' or
+    'needs_review' to either 'matched' or back to 'needs_review'.
     """
     invoice = db.query(models.Invoice).options(
         joinedload(models.Invoice.purchase_orders),
@@ -23,6 +25,10 @@ def run_match_for_invoice(db: Session, invoice_db_id: int):
         return
 
     print(f"\n--- Running Matching Engine for Invoice: {invoice.invoice_id} (DB ID: {invoice.id}) ---")
+    
+    # Set status to 'matching' to indicate it's being processed
+    invoice.status = models.DocumentStatus.matching
+    db.commit()
 
     trace: List[Dict[str, Any]] = []
     add_trace(trace, "Initialisation", "INFO", f"Starting validation for Invoice {invoice.invoice_id}.")
@@ -58,7 +64,7 @@ def run_match_for_invoice(db: Session, invoice_db_id: int):
         models.Invoice.id != invoice.id,
         models.Invoice.vendor_name == invoice.vendor_name,
         models.Invoice.invoice_id == invoice.invoice_id,
-        models.Invoice.status.in_([models.DocumentStatus.approved_for_payment, models.DocumentStatus.paid])
+        models.Invoice.status.in_([models.DocumentStatus.matched, models.DocumentStatus.paid])
     ).all()
     if potential_duplicates:
         dup_ids = [d.invoice_id for d in potential_duplicates]
@@ -157,38 +163,35 @@ def _finalize_invoice_status(invoice: models.Invoice, trace: List, db: Session, 
     
     category = None
     if has_failures or is_non_po:
-        # Determine the primary reason for failure
+        category = "data_mismatch" # Default
         if is_non_po:
             category = "missing_document"
         else:
-            category = "data_mismatch" # Default
             for step in trace:
                 if step.get("status") == "FAIL":
                     if "Timing Check" in step.get("step", "") or "Duplicate Check" in step.get("step", ""):
-                        category = "policy_violation"
-                        break
+                        category = "policy_violation"; break
                     if "Item not found" in step.get("message", ""):
-                        category = "missing_document"
-                        break
+                        category = "missing_document"; break
     
     invoice.review_category = category
 
     if is_non_po:
         invoice.status = models.DocumentStatus.needs_review
-        add_trace(trace, "Final Result", "INFO", "Non-PO invoice queued for GL coding and manual approval.")
-        print(f"     [INFO] Non-PO Invoice {invoice.invoice_id} requires review. Category: {category}")
+        add_trace(trace, "Final Result", "INFO", "Non-PO invoice queued for manual review.")
+        log_audit_event(db, invoice.id, "Matching Engine", f"Match Complete: Non-PO, requires review")
     elif has_failures:
         invoice.status = models.DocumentStatus.needs_review
         add_trace(trace, "Final Result", "FAIL", "Invoice requires manual review due to validation failures.")
-        print(f"     [FAIL] Invoice {invoice.invoice_id} requires review. Category: {category}")
+        log_audit_event(db, invoice.id, "Matching Engine", f"Match Failed: Requires review ({category})")
     else:
-        invoice.status = models.DocumentStatus.approved_for_payment
+        invoice.status = models.DocumentStatus.matched
         invoice.review_category = None
-        add_trace(trace, "Final Result", "PASS", "All checks passed. Invoice approved for payment.")
-        print(f"     [SUCCESS] Invoice {invoice.invoice_id} approved for payment.")
+        add_trace(trace, "Final Result", "PASS", "All checks passed. Invoice is matched and ready for payment.")
+        log_audit_event(db, invoice.id, "Matching Engine", "Match Succeeded")
     
     db.commit()
-    print(f"--- Matching Engine finished for Invoice: {invoice.invoice_id} ---")
+    print(f"--- Matching Engine finished for Invoice: {invoice.invoice_id} with status {invoice.status.value} ---")
 
 def add_trace(trace_list: List, step: str, status: str, message: str, details: Dict = None):
     """Standardizes adding entries to the match trace."""

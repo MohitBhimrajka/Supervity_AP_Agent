@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.session import create_db_and_tables, SessionLocal
 # --- ADD COPILOT TO IMPORTS ---
-from app.api.endpoints import documents, dashboard, invoices, copilot, learning, notifications, configuration, collaboration, payments
+from app.api.endpoints import documents, dashboard, invoices, copilot, learning, notifications, configuration, workflow, payments
 from app.core.monitoring_service import run_monitoring_cycle
 from app.modules.automation import executor as automation_executor
 
@@ -70,7 +70,7 @@ app.include_router(copilot.router, prefix="/api/copilot", tags=["AP Copilot"]) #
 app.include_router(learning.router, prefix="/api/learning", tags=["Learning & Heuristics"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(configuration.router, prefix="/api/config", tags=["Configuration & Settings"]) # <-- RENAMED TAG
-app.include_router(collaboration.router, prefix="/api", tags=["Collaboration"])
+app.include_router(workflow.router, prefix="/api/workflow", tags=["Workflow & Audit"])
 app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
 
 

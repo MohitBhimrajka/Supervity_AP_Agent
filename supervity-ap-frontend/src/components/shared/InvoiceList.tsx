@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { type Invoice, getInvoices } from "@/lib/api";
+import toast from 'react-hot-toast';
 
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/Button";
@@ -10,7 +11,6 @@ interface InvoiceListProps {
     selectedInvoiceId: string | null;
     onInvoiceSelect: (invoice: Invoice) => void;
     refreshKey?: number;
-    initialInvoiceId?: string | null;
 }
 
 // --- MODIFIED HELPER FUNCTION ---
@@ -26,33 +26,28 @@ const getCategoryVariant = (category: string | null | undefined): string => {
     }
 }
 
-export const InvoiceList = ({ selectedInvoiceId, onInvoiceSelect, refreshKey, initialInvoiceId }: InvoiceListProps) => {
+export const InvoiceList = ({ selectedInvoiceId, onInvoiceSelect, refreshKey }: InvoiceListProps) => {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState("needs_review");
 
     useEffect(() => {
         const fetchInvoices = async () => {
+            if (!statusFilter) return; 
+
             setIsLoading(true);
             try {
                 const data = await getInvoices(statusFilter);
                 setInvoices(data);
-
-                if (initialInvoiceId && data.length > 0) {
-                    const invoiceToSelect = data.find(inv => inv.invoice_id === initialInvoiceId);
-                    if (invoiceToSelect) {
-                        onInvoiceSelect(invoiceToSelect);
-                    }
-                }
-
             } catch (error) {
                 console.error(error);
+                toast.error("Failed to fetch invoices");
             } finally {
                 setIsLoading(false);
             }
         };
         fetchInvoices();
-    }, [statusFilter, refreshKey, initialInvoiceId, onInvoiceSelect]);
+    }, [statusFilter, refreshKey]);
 
     return (
         <div className="flex flex-col h-full">
@@ -60,7 +55,7 @@ export const InvoiceList = ({ selectedInvoiceId, onInvoiceSelect, refreshKey, in
                 <h3 className="text-lg font-semibold">Work Queue</h3>
                 <div className="flex gap-2 mt-2">
                     <Button size="sm" variant={statusFilter === 'needs_review' ? 'primary' : 'secondary'} onClick={() => setStatusFilter('needs_review')}>Review</Button>
-                    <Button size="sm" variant={statusFilter === 'approved_for_payment' ? 'primary' : 'secondary'} onClick={() => setStatusFilter('approved_for_payment')}>Approved</Button>
+                    <Button size="sm" variant={statusFilter === 'matched' ? 'primary' : 'secondary'} onClick={() => setStatusFilter('matched')}>Approved</Button>
                 </div>
             </div>
             <div className="flex-grow overflow-y-auto">

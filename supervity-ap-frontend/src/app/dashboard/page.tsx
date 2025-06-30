@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Zap, Clock, AlertCircle, TrendingUp, TrendingDown, FileInput, Filter, Check, Loader2, DollarSign } from 'lucide-react';
 import { ExceptionChart } from '@/components/dashboard/ExceptionChart';
 import { CostRoiCard } from '@/components/dashboard/CostRoiCard';
+import { ActionQueue } from '@/components/dashboard/ActionQueue';
 import { StaggeredFadeIn, FadeInItem } from '@/components/dashboard/StaggeredFadeIn';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import { subDays, format } from 'date-fns';
@@ -94,8 +95,7 @@ export default function DashboardPage() {
         <StaggeredFadeIn>
             <div className="space-y-6">
                 <FadeInItem>
-                    <div className="flex justify-between items-center">
-                        <h1 className="text-2xl font-bold text-gray-800">AP Dashboard</h1>
+                    <div className="flex justify-end items-center">
                         <DateRangePicker value={dateRange} onValueChange={setDateRange} />
                     </div>
                 </FadeInItem>
@@ -109,43 +109,52 @@ export default function DashboardPage() {
                     </div>
                 </FadeInItem>
                 
-                <FadeInItem>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Invoice Pipeline</CardTitle>
-                            <CardDescription>A real-time overview of the document processing flow for the selected period.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="relative w-full max-w-3xl mx-auto py-4">
-                                {funnelData.map((step, index) => (
-                                    <div key={step.title} className="relative z-10 flex justify-center mb-2">
-                                        <div className="w-full flex justify-center" style={{ transform: `scale(${1 - (index * 0.12)})`}}>
-                                            <div className={`w-full max-w-lg ${step.color} text-white rounded-lg p-3 shadow-lg flex items-center justify-between`}>
-                                                <div className="flex items-center">
-                                                    <div className="bg-white/20 p-2 rounded-full mr-4"><step.icon className="w-6 h-6" /></div>
-                                                    <p className="font-semibold">{step.title}</p>
-                                                </div>
-                                                <div className="text-2xl font-bold">{step.value}</div>
-                                            </div>
-                                        </div>
-                                        {/* Connecting Line */}
-                                        {index < funnelData.length - 1 && (
-                                            <div className="absolute -bottom-5 left-1/2 transform -translate-x-1/2 w-px h-6 bg-gray-300 z-0"></div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </FadeInItem>
+
 
                 <FadeInItem>
                     <div className="grid gap-6 lg:grid-cols-5">
                         <div className="lg:col-span-2">
-                            <CostRoiCard data={costRoiData} />
+                            <ActionQueue />
                         </div>
                         <div className="lg:col-span-3">
                             <ExceptionChart data={exceptionData} />
+                        </div>
+                    </div>
+                </FadeInItem>
+
+                <FadeInItem>
+                    <div className="grid gap-6 lg:grid-cols-3">
+                        <div className="lg:col-span-2">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Invoice Pipeline</CardTitle>
+                                    <CardDescription>A real-time overview of the document processing flow for the selected period.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="relative w-full max-w-3xl mx-auto py-4">
+                                        {funnelData.map((step, index) => (
+                                            <div key={step.title} className="relative z-10 flex justify-center mb-2">
+                                                <div className="w-full flex justify-center" style={{ transform: `scale(${1 - (index * 0.12)})`}}>
+                                                    <div className={`w-full max-w-lg ${step.color} text-white rounded-lg p-3 shadow-lg flex items-center justify-between`}>
+                                                        <div className="flex items-center">
+                                                            <div className="bg-white/20 p-2 rounded-full mr-4"><step.icon className="w-6 h-6" /></div>
+                                                            <p className="font-semibold">{step.title}</p>
+                                                        </div>
+                                                        <div className="text-2xl font-bold">{step.value}</div>
+                                                    </div>
+                                                </div>
+                                                {/* Connecting Line */}
+                                                {index < funnelData.length - 1 && (
+                                                    <div className="absolute -bottom-5 left-1/2 transform -translate-x-1/2 w-px h-6 bg-gray-300 z-0"></div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                        <div className="lg:col-span-1">
+                            <CostRoiCard data={costRoiData} />
                         </div>
                     </div>
                 </FadeInItem>

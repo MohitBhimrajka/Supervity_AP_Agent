@@ -2,7 +2,7 @@
 import enum
 from datetime import datetime
 from sqlalchemy import (Column, Integer, String, Float, Date, JSON, Enum, 
-                        ForeignKey, DateTime, func)
+                        ForeignKey, DateTime, func, Boolean)
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -19,25 +19,15 @@ class InvoiceGRNAssociation(Base):
     grn_id = Column(Integer, ForeignKey('goods_receipt_notes.id'), primary_key=True)
 
 class DocumentStatus(str, enum.Enum):
-    # Initial states
-    pending_ingestion = "pending_ingestion"
-    pending_match = "pending_match"
-
-    # Review & Exception states
+    ingested = "ingested"
+    matching = "matching"
     needs_review = "needs_review"
-    disputed = "disputed"
-    
-    # Final states
-    approved_for_payment = "approved_for_payment"
-    pending_payment = "pending_payment" # For payment batches
+    pending_vendor_response = "pending_vendor_response"
+    pending_internal_response = "pending_internal_response"
+    matched = "matched"
+    pending_payment = "pending_payment"
     paid = "paid"
     rejected = "rejected"
-    archived = "archived"
-    
-    # Legacy statuses for a smooth transition
-    exception = "exception"
-    matched = "matched"
-    approved = "approved"
 
 class Job(Base):
     __tablename__ = "jobs"
@@ -57,7 +47,10 @@ class AuditLog(Base):
     entity_type = Column(String, index=True) 
     entity_id = Column(String, index=True)   
     action = Column(String) 
+    summary = Column(String, nullable=True) # Human-readable summary for beautiful UI
     details = Column(JSON, nullable=True)
+    invoice_db_id = Column(Integer, ForeignKey("invoices.id"), nullable=True, index=True)
+    invoice = relationship("Invoice", back_populates="audit_logs")
 
 class VendorSetting(Base):
     __tablename__ = "vendor_settings"
@@ -174,10 +167,6 @@ class Invoice(Base):
     vendor_name = Column(String)
     buyer_name = Column(String)
     
-    # REMOVE THESE TWO LINES:
-    # po_number = Column(String, index=True, nullable=True)
-    # grn_number = Column(String, ForeignKey("goods_receipt_notes.grn_number"), index=True, nullable=True)
-    
     # ADD THIS NEW FIELD for line-item level PO numbers:
     # This stores an array of PO numbers found on the invoice for easy lookup
     # without needing to join tables every time.
@@ -196,9 +185,8 @@ class Invoice(Base):
     match_trace = Column(JSON, nullable=True)
     # --- END MODIFICATION ---
     
-    status = Column(Enum(DocumentStatus), default=DocumentStatus.pending_match, nullable=False)
+    status = Column(Enum(DocumentStatus), default=DocumentStatus.ingested, nullable=False)
     
-    # --- ADD THIS NEW FIELD ---
     review_category = Column(String, nullable=True) # e.g., 'data_mismatch', 'missing_document', 'policy_violation'
     
     ai_recommendation = Column(JSON, nullable=True)
@@ -227,15 +215,12 @@ class Invoice(Base):
     job_id = Column(Integer, ForeignKey("jobs.id"), nullable=True)
     job = relationship("Job")
 
-    # REMOVE THIS RELATIONSHIP:
-    # grn = relationship("GoodsReceiptNote", back_populates="invoices")
-
     # ADD THESE NEW RELATIONSHIPS:
     purchase_orders = relationship("PurchaseOrder", secondary="invoice_po_association", back_populates="invoices")
     grns = relationship("GoodsReceiptNote", secondary="invoice_grn_association", back_populates="invoices")
+    comments = relationship("Comment", back_populates="invoice", cascade="all, delete-orphan")
+    audit_logs = relationship("AuditLog", back_populates="invoice", cascade="all, delete-orphan")
 
-
-# ADD THIS NEW CLASS AT THE END OF THE FILE
 class Comment(Base):
     __tablename__ = "comments"
     id = Column(Integer, primary_key=True, index=True)
@@ -243,5 +228,6 @@ class Comment(Base):
     user = Column(String, default="System") # Should be linked to a User model in a real app
     text = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    invoice = relationship("Invoice") 
+    # Add a type field for distinguishing communications
+    type = Column(String, default="internal") # 'internal', 'vendor', 'internal_review'
+    invoice = relationship("Invoice", back_populates="comments") 

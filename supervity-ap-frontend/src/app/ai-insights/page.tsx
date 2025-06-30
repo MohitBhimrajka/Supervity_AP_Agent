@@ -17,7 +17,7 @@ const ConfidenceBar = ({ score }: { score: number }) => (
     </div>
 );
 
-export default function AutomationPage() {
+export default function AiInsightsPage() {
     const [heuristics, setHeuristics] = useState<AggregatedHeuristic[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,7 +51,6 @@ export default function AutomationPage() {
             toast.success("Automation rule created successfully!");
             setIsModalOpen(false);
             setRuleToCreate(null);
-            // Optionally, refresh the list or navigate to the config page
         } catch (error) {
             toast.error(`Failed to create rule: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
@@ -59,10 +58,9 @@ export default function AutomationPage() {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-gray-800">Automation Center</h1>
             <Card>
                 <CardHeader>
-                    <CardTitle>Automation Opportunities</CardTitle>
+                    <CardTitle>AI-Driven Automation Opportunities</CardTitle>
                     <CardDescription>The AI has identified these patterns from your team&apos;s actions. High-confidence patterns are ideal candidates for one-click automation.</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -80,6 +78,13 @@ export default function AutomationPage() {
                           <TableBody>
                             {isLoading ? (
                                 <TableRow><TableCell colSpan={5} className="text-center h-24">Analyzing patterns...</TableCell></TableRow>
+                            ) : heuristics.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center h-32 text-gray-500">
+                                        <p className="font-semibold">No Patterns Learned Yet</p>
+                                        <p className="text-sm mt-1">As you resolve invoices in the workbench, the AI will identify recurring patterns and suggest automations here.</p>
+                                    </TableCell>
+                                </TableRow>
                             ) : heuristics.map(h => (
                               <TableRow key={h.id}>
                                 <TableCell>

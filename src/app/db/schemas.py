@@ -1,5 +1,5 @@
 # src/app/db/schemas.py
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Any, Dict
 from datetime import date, datetime
 from app.db.models import DocumentStatus
@@ -15,30 +15,22 @@ class LineItem(BaseModel):
 class InvoiceBase(BaseModel):
     invoice_id: str
     vendor_name: Optional[str] = None
-    buyer_name: Optional[str] = None
-    related_po_numbers: Optional[List[str]] = None
-    po_number: Optional[str] = None
-    grn_number: Optional[str] = None
+    related_po_numbers: Optional[List[str]] = []
     invoice_date: Optional[date] = None
-    due_date: Optional[date] = None
-    subtotal: Optional[float] = None
-    tax: Optional[float] = None
     grand_total: Optional[float] = None
-    line_items: Optional[List[LineItem]] = None
-    gl_code: Optional[str] = None
+    line_items: Optional[List[Dict[str, Any]]] = []
 
 class PurchaseOrderBase(BaseModel):
     po_number: str
     vendor_name: Optional[str] = None
-    buyer_name: Optional[str] = None
     order_date: Optional[date] = None
-    line_items: Optional[List[Any]] = None
+    line_items: Optional[List[Any]] = []
 
 class GoodsReceiptNoteBase(BaseModel):
     grn_number: str
     po_number: Optional[str] = None
     received_date: Optional[date] = None
-    line_items: Optional[List[Any]] = None
+    line_items: Optional[List[Any]] = []
 
 class JobBase(BaseModel):
     status: Optional[str] = "processing"
@@ -47,9 +39,9 @@ class JobBase(BaseModel):
     summary: Optional[List[Dict[str, Any]]] = None
 
 class AuditLogBase(BaseModel):
-    entity_type: str
-    entity_id: str
+    user: str
     action: str
+    summary: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
 
 
@@ -68,7 +60,9 @@ class JobCreate(JobBase):
     pass
 
 class AuditLogCreate(AuditLogBase):
-    pass
+    entity_type: str
+    entity_id: str
+    invoice_db_id: Optional[int] = None
 
 class LearnedHeuristicBase(BaseModel):
     vendor_name: str
@@ -109,11 +103,7 @@ class Notification(NotificationBase):
 class Invoice(InvoiceBase):
     id: int
     status: DocumentStatus
-    match_trace: Optional[Any] = None
-    job_id: Optional[int] = None
-
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
 # --- ADD NEW LIGHTWEIGHT SCHEMA FOR LIST VIEWS ---
 class InvoiceSummary(BaseModel):
@@ -124,38 +114,30 @@ class InvoiceSummary(BaseModel):
     grand_total: Optional[float] = None
     status: DocumentStatus
     invoice_date: Optional[date] = None
-    review_category: Optional[str] = None
-
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 # --- END NEW SCHEMA ---
 
 class PurchaseOrder(PurchaseOrderBase):
     id: int
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
 class GoodsReceiptNote(GoodsReceiptNoteBase):
     id: int
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
 class Job(JobBase):
     id: int
     created_at: datetime
     completed_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
 class AuditLog(AuditLogBase):
     id: int
     timestamp: datetime
-
-    class Config:
-        from_attributes = True
+    entity_type: str
+    entity_id: str
+    summary: Optional[str] = None
+    class Config: from_attributes = True
 
 
 # --- API Request/Response Schemas ---
@@ -175,7 +157,7 @@ class ChatResponse(BaseModel):
     tool_calls: Optional[List[ToolCall]] = None
 
 class UpdateInvoiceStatusRequest(BaseModel):
-    new_status: str
+    new_status: DocumentStatus
     reason: Optional[str] = None
 
 # --- Search Schemas ---
@@ -186,9 +168,9 @@ class FilterCondition(BaseModel):
     value: Any
 
 class SearchRequest(BaseModel):
-    filters: List[FilterCondition]
-    sort_by: Optional[str] = 'invoice_date'  # Add sort_by
-    sort_order: Optional[str] = 'desc'       # Add sort_order
+    filters: List[FilterCondition] = Field(default_factory=list)
+    sort_by: str = 'invoice_date'
+    sort_order: str = 'desc'
 
 # --- NEW CONFIGURATION SCHEMAS ---
 
@@ -228,8 +210,9 @@ class AutomationRule(AutomationRuleBase):
 
 # ADD THESE NEW SCHEMAS
 class CommentBase(BaseModel):
+    user: str = "System"
     text: str
-    user: Optional[str] = "System"
+    type: str = "internal"
 
 class CommentCreate(CommentBase):
     pass
@@ -237,6 +220,7 @@ class CommentCreate(CommentBase):
 class Comment(CommentBase):
     id: int
     created_at: datetime
-    
-    class Config:
-        from_attributes = True 
+    class Config: from_attributes = True
+
+class BatchActionRequest(BaseModel):
+    invoice_ids: List[int] 

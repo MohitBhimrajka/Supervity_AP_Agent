@@ -54,6 +54,8 @@ export const SideCanvas = () => {
                     {canvasContent?.data ? <DataRenderer data={canvasContent.data} /> : <p>No data to display.</p>}
                 </div>
               );
+          case 'component':
+              return canvasContent.content || null;
           default:
               return null;
       }

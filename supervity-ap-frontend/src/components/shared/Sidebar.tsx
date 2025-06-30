@@ -8,7 +8,7 @@ import {
   LayoutDashboard, 
   GanttChartSquare, 
   DatabaseZap, // New Icon for Data Center
-      ClipboardList, // New Icon for Invoice Manager
+  ClipboardList, // New Icon for Invoice Manager
   SlidersHorizontal, // New Icon for Configuration
   Sparkles // New Icon for Automation
 } from "lucide-react";
@@ -17,12 +17,10 @@ import {
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/data-center", icon: DatabaseZap, label: "Data Center" },
-      { href: "/invoice-explorer", icon: ClipboardList, label: "Invoice Manager" },
-  { href: "/resolution-workbench", icon: GanttChartSquare, label: "Resolution Workbench" },
-  // --- MODIFIED SECTION ---
-  { href: "/learned-insights", icon: Sparkles, label: "Automation" },
-  { href: "/settings", icon: SlidersHorizontal, label: "Configuration" },
-  // --- END MODIFICATION ---
+  { href: "/invoice-explorer", icon: GanttChartSquare, label: "Invoice Explorer" },
+  { href: "/resolution-workbench", icon: ClipboardList, label: "Resolution Workbench" },
+  { href: "/ai-insights", icon: Sparkles, label: "AI Insights" },
+  { href: "/ai-policies", icon: SlidersHorizontal, label: "AI Policies" },
 ];
 
 export const Sidebar = () => {

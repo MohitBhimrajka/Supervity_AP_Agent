@@ -7,17 +7,18 @@ from datetime import datetime
 
 from app.api.dependencies import get_db
 from app.db import models, schemas
+from app.utils.auditing import log_audit_event
 
 router = APIRouter()
 
 class CreatePaymentBatchRequest(BaseModel):
     invoice_ids: List[int] # List of invoice database IDs
 
-@router.get("/payable", response_model=List[schemas.Invoice])
+@router.get("/payable", response_model=List[schemas.InvoiceSummary])
 def get_payable_invoices(db: Session = Depends(get_db)):
-    """Retrieves all invoices with status 'approved_for_payment'."""
+    """Retrieves all invoices with status 'matched'."""
     return db.query(models.Invoice).filter(
-        models.Invoice.status == models.DocumentStatus.approved_for_payment
+        models.Invoice.status == models.DocumentStatus.matched
     ).order_by(models.Invoice.due_date.asc()).all()
 
 @router.post("/batches", status_code=201)
@@ -26,7 +27,7 @@ def create_payment_batch(
     db: Session = Depends(get_db)
 ):
     """
-    Creates a payment batch from a list of invoice IDs, updates their status
+    Creates a payment batch from a list of 'matched' invoice IDs, updates their status
     to 'pending_payment', and stamps them with a unique batch ID.
     """
     if not request.invoice_ids:
@@ -34,12 +35,11 @@ def create_payment_batch(
 
     invoices = db.query(models.Invoice).filter(
         models.Invoice.id.in_(request.invoice_ids),
-        models.Invoice.status == models.DocumentStatus.approved_for_payment
+        models.Invoice.status == models.DocumentStatus.matched
     ).all()
 
     if len(invoices) != len(request.invoice_ids):
-        # This indicates some IDs were invalid or not in the correct status
-        print("Warning: Mismatch in provided invoice IDs and valid payable invoices.")
+        raise HTTPException(status_code=400, detail="One or more invoices were not in 'matched' status or did not exist.")
 
     if not invoices:
         raise HTTPException(status_code=400, detail="No valid invoices found to create a batch.")
@@ -49,14 +49,13 @@ def create_payment_batch(
     
     for inv in invoices:
         inv.status = models.DocumentStatus.pending_payment
-        inv.payment_batch_id = batch_id # <-- STAMP THE BATCH ID
+        inv.payment_batch_id = batch_id
         total_amount += inv.grand_total or 0
         
-        audit_log = models.AuditLog(
-            entity_type='Invoice', entity_id=inv.invoice_id, user='System',
+        log_audit_event(
+            db=db, invoice_db_id=inv.id, user='System',
             action='Added to Payment Batch', details={"batch_id": batch_id}
         )
-        db.add(audit_log)
 
     db.commit()
 

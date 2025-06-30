@@ -64,7 +64,7 @@ def prepare_grn_data(extracted_data: Dict) -> Dict:
     }
 
 def prepare_invoice_data(extracted_data: Dict, job_id: int) -> Dict:
-    """Prepare invoice data with proper date conversion."""
+    """Prepare invoice data with proper date conversion and initial status."""
     return {
         'invoice_id': extracted_data.get("invoice_id"),
         'vendor_name': extracted_data.get("vendor_name"),
@@ -80,6 +80,7 @@ def prepare_invoice_data(extracted_data: Dict, job_id: int) -> Dict:
         'discount_due_date': convert_string_to_date(extracted_data.get("discount_due_date")),
         'related_po_numbers': extracted_data.get("related_po_numbers", []),
         'job_id': job_id,
+        'status': models.DocumentStatus.ingested,
     }
 
 def ingest_document(db: Session, job_id: int, file_content: bytes, filename: str) -> Tuple[bool, List[str] | None, Dict[str, Any]]:

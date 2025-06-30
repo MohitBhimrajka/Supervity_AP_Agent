@@ -13,6 +13,7 @@ from app.db import models, schemas
 from app.core import background_tasks as tasks_service
 # ADD THIS IMPORT
 from app.modules.matching import engine as matching_engine
+from app.utils.auditing import log_audit_event
 from sqlalchemy.orm import joinedload
 
 router = APIRouter()
@@ -259,7 +260,7 @@ def update_purchase_order(
 ):
     """
     Updates a Purchase Order's details and triggers a re-match for all
-    related invoices. Includes server-side validation.
+    related invoices. Includes server-side validation and detailed auditing.
     """
     po = db.query(models.PurchaseOrder).options(
         joinedload(models.PurchaseOrder.invoices)
@@ -302,27 +303,41 @@ def update_purchase_order(
             if key in po.raw_data_payload:
                 po.raw_data_payload[key] = value
 
-    # Log the action
-    audit_log = models.AuditLog(
-        entity_type='PurchaseOrder',
-        entity_id=str(po.id),
-        user='System', # Should be replaced with actual user from auth
-        action='Updated from Workbench',
-        details={'changes': changes}
-    )
-    db.add(audit_log)
-    
-    # Find all related invoices to rematch
     invoices_to_rematch = po.invoices
     
-    db.commit() # Commit the PO changes first
+    # Create a simple diff summary for the audit log
+    summary_parts = []
+    if 'line_items' in changes:
+        # A more sophisticated diff could be done here, but for now, this is clear
+        summary_parts.append(f"Updated {len(changes['line_items'])} line item(s).")
+    other_changes = {k: v for k, v in changes.items() if k != 'line_items'}
+    if other_changes:
+        summary_parts.append(f"Updated fields: {', '.join(other_changes.keys())}.")
     
-    # Trigger a background task to re-run matching for all affected invoices
+    update_summary = " ".join(summary_parts) if summary_parts else "No specific changes detailed."
+
+    # Log the audit event for each affected invoice before committing
     for inv in invoices_to_rematch:
+        log_audit_event(
+            db,
+            invoice_db_id=inv.id,
+            user='AP Team',
+            action='PO Updated, Triggering Rematch',
+            summary=f"PO {po.po_number} was updated. {update_summary}",
+            details={'po_number': po.po_number, 'changes': changes}
+        )
+    
+    db.commit() # Commit PO changes and audit logs together
+    
+    # Trigger background re-match for all affected invoices
+    for inv in invoices_to_rematch:
+        print(f"Queueing invoice ID {inv.id} for re-matching due to PO update.")
+        # Pass only the ID to the background task
         background_tasks.add_task(matching_engine.run_match_for_invoice, db, inv.id)
 
     db.refresh(po)
-    return {"message": "Purchase Order updated. Rematching related invoices in the background.", "po": schemas.PurchaseOrder.from_orm(po)}
+    # Return a success message. The frontend will poll for the new status.
+    return {"message": "Purchase Order updated. Rematching related invoices in the background."}
 
 
 @router.get("/jobs/{job_id}/invoices", response_model=List[schemas.Invoice])

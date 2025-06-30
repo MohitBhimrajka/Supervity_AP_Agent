@@ -21,10 +21,7 @@ def get_thread_db_session():
         db.close()
 
 def process_single_document(job_id: int, file_info: Dict[str, Any]):
-    """
-    Process a single document.
-    Returns a dictionary with detailed results for this file.
-    """
+    """Processes a single document and returns its DB ID if it's an invoice."""
     file_content = file_info["content"]
     filename = file_info["filename"]
     
@@ -38,12 +35,18 @@ def process_single_document(job_id: int, file_info: Dict[str, Any]):
             )
             if success:
                 doc_id = extracted_data.get('invoice_id') or extracted_data.get('grn_number') or extracted_data.get('po_number')
+                invoice_db_id = None
+                if extracted_data.get('document_type') == 'Invoice':
+                    # Get the ID of the newly created invoice
+                    inv_obj = db.query(models.Invoice.id).filter_by(invoice_id=extracted_data.get('invoice_id')).scalar()
+                    invoice_db_id = inv_obj
                 return {
                     "filename": filename,
                     "status": "success",
                     "message": f"Successfully ingested as {extracted_data.get('document_type', 'Unknown')}",
                     "extracted_id": doc_id,
-                    "affected_pos": affected_po_numbers
+                    "affected_pos": affected_po_numbers,
+                    "invoice_db_id": invoice_db_id
                 }
             else:
                 # Ingestion service now returns the error message
@@ -75,8 +78,7 @@ def update_job_progress(job_id: int, processed_count: int, status: str = "proces
 
 def process_uploaded_documents(job_id: int, files_data: List[Dict[str, Any]]):
     """
-    The main background task for processing a batch of uploaded files in parallel.
-    Now processes POs first to prevent race conditions.
+    Orchestrates ingestion and then triggers the matching phase.
     """
     db = SessionLocal()
     job = db.query(models.Job).filter_by(id=job_id).first()
@@ -85,9 +87,10 @@ def process_uploaded_documents(job_id: int, files_data: List[Dict[str, Any]]):
         return
 
     try:
-        print(f"Starting 3-Pass Ingestion for Job ID: {job_id}")
+        print(f"Starting Ingestion for Job ID: {job_id}")
         all_results = []
         affected_pos_set = set()
+        invoice_ids_to_match = []
         
         # --- START REWORKED 3-PASS LOGIC (WITH FIX) ---
         # Create mutually exclusive lists of files to process
@@ -139,30 +142,31 @@ def process_uploaded_documents(job_id: int, files_data: List[Dict[str, Any]]):
                 all_results.append(result)
                 if result.get("status") == "success" and result.get("affected_pos"):
                     affected_pos_set.update(result["affected_pos"])
+                if result.get("status") == "success" and result.get("invoice_db_id"):
+                    invoice_ids_to_match.append(result["invoice_db_id"])
                 processed_count += 1
                 update_job_progress(job_id, processed_count)
         # --- END REWORKED 3-PASS LOGIC ---
         
-        # --- 4. Matching Phase ---
-        print(f"Starting Matching Phase for Job ID: {job_id}")
+        # --- NEW Matching Phase ---
+        print(f"Ingestion complete. Queueing {len(invoice_ids_to_match)} invoices for matching.")
         update_job_progress(job_id, job.total_files, status="matching")
 
-        invoices_to_match = db.query(models.Invoice).filter(models.Invoice.job_id == job_id).all()
-        print(f"Found {len(invoices_to_match)} invoices from this job to match.")
-
-        for invoice in invoices_to_match:
+        for inv_id in invoice_ids_to_match:
             try:
-                matching_engine.run_match_for_invoice(db, invoice.id)
+                # We can call this directly since it's in a background task context
+                matching_engine.run_match_for_invoice(db, inv_id)
             except Exception as e:
-                print(f"  [ERROR] Matching failed for Invoice ID {invoice.id}: {e}")
-                invoice.status = models.DocumentStatus.needs_review
-                invoice.match_trace = [{"step": "Engine Error", "status": "FAIL", "message": str(e)}]
-                db.commit()
+                print(f"  [ERROR] Matching failed for Invoice ID {inv_id}: {e}")
+                inv = db.query(models.Invoice).filter(models.Invoice.id == inv_id).first()
+                if inv:
+                    inv.status = models.DocumentStatus.needs_review
+                    inv.match_trace = [{"step": "Engine Error", "status": "FAIL", "message": str(e)}]
+                    db.commit()
         
-        # --- 5. Finalize Job ---
         job.status = "completed"
         job.completed_at = datetime.utcnow()
-        job.summary = sorted(all_results, key=lambda x: x['filename']) # Sort results for consistency
+        job.summary = sorted(all_results, key=lambda x: x['filename'])
         db.commit()
         print(f"Job ID: {job_id} finalized successfully.")
 

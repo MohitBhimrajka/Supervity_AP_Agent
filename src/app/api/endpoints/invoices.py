@@ -1,5 +1,5 @@
 # src/app/api/endpoints/invoices.py
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
@@ -10,6 +10,8 @@ from app.db import models, schemas
 from app.utils import data_formatting
 # ADD THIS NEW IMPORT
 from app.modules.matching import comparison as comparison_service
+from app.modules.matching import engine as matching_engine
+from app.utils.auditing import log_audit_event
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -106,7 +108,7 @@ def update_invoice_status_endpoint(
         invoice.paid_date = datetime.utcnow().date()
     
     # THE LEARNING TRIGGER: If an invoice that needed review is now approved, learn from it.
-    if old_status == models.DocumentStatus.needs_review and new_status_enum == models.DocumentStatus.approved_for_payment:
+    if old_status == models.DocumentStatus.needs_review and new_status_enum == models.DocumentStatus.matched:
         print(f"🧠 Learning from manual approval of invoice {invoice.invoice_id}...")
         _learn_from_manual_approval(db, invoice)
     
@@ -200,7 +202,7 @@ def _learn_from_manual_approval(db: Session, invoice: models.Invoice):
             vendor_name=invoice.vendor_name,
             exception_type=exception_type,
             learned_condition=learned_condition,
-            resolution_action=models.DocumentStatus.approved_for_payment.value,
+            resolution_action=models.DocumentStatus.matched.value,
             trigger_count=1,
             confidence_score=0.5 # Start with a moderate confidence for a new rule
         )
@@ -233,6 +235,16 @@ def update_invoice_notes(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     invoice.notes = request.notes
+    
+    # Log the audit event with summary
+    log_audit_event(
+        db, 
+        invoice.id, 
+        "AP Team", 
+        "Reference Notes Updated", 
+        summary=f"Notes updated: '{request.notes[:50]}{'...' if len(request.notes) > 50 else ''}'"
+    )
+    
     db.commit()
     
     return {"message": "Notes updated successfully."}
@@ -249,17 +261,17 @@ def update_invoice_gl_code(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     invoice.gl_code = request.gl_code
-    db.commit()
     
-    # Log the action
-    audit_log = models.AuditLog(
-        entity_type='Invoice',
-        entity_id=invoice.invoice_id,
-        user='System',
-        action='GL Code Applied',
+    # Log the action using the utility with summary
+    log_audit_event(
+        db, 
+        invoice.id, 
+        "AP Team", 
+        "GL Code Applied", 
+        summary=f"GL Code set to '{request.gl_code}'.",
         details={'gl_code': request.gl_code}
     )
-    db.add(audit_log)
+    
     db.commit()
     
     return {"message": "GL Code updated successfully."}
@@ -352,3 +364,48 @@ def get_invoices_by_category(category: str, db: Session = Depends(get_db)):
         models.Invoice.status == models.DocumentStatus.needs_review,
         models.Invoice.review_category == category
     ).order_by(models.Invoice.invoice_date.desc()).all()
+
+@router.post("/batch-rematch", status_code=202)
+def batch_rematch_invoices(
+    request: schemas.BatchActionRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Triggers a re-match for a list of invoices."""
+    if not request.invoice_ids:
+        raise HTTPException(status_code=400, detail="No invoice IDs provided.")
+
+    invoices = db.query(models.Invoice).filter(models.Invoice.id.in_(request.invoice_ids)).all()
+    
+    rematched_count = 0
+    for inv in invoices:
+        # Change status to 'matching' immediately for better UX
+        inv.status = models.DocumentStatus.matching
+        log_audit_event(
+            db=db, 
+            invoice_db_id=inv.id, 
+            user="AP Team", 
+            action="Manual Rematch Triggered", 
+            summary="Rematch triggered from Invoice Explorer.",
+            details={"source": "Invoice Explorer"}
+        )
+        background_tasks.add_task(matching_engine.run_match_for_invoice, db, inv.id)
+        rematched_count += 1
+    
+    db.commit()
+
+    return {
+        "message": f"Successfully queued {rematched_count} invoice(s) for re-matching.",
+        "rematched_count": rematched_count
+    }
+
+@router.get("/by-string-id/{invoice_id_str:path}", response_model=schemas.InvoiceSummary)
+def get_invoice_by_string_id(invoice_id_str: str, db: Session = Depends(get_db)):
+    """
+    Retrieves a single invoice's summary data using its string-based ID.
+    The ":path" converter allows the ID to contain slashes.
+    """
+    invoice = db.query(models.Invoice).filter(models.Invoice.invoice_id == invoice_id_str).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail=f"Invoice with ID '{invoice_id_str}' not found.")
+    return invoice

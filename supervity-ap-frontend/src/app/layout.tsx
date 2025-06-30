@@ -10,7 +10,7 @@ import { SideCanvas } from "@/components/shared/SideCanvas";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Supervity AP Command Center",
+  title: "Supervity AI AP Manager",
   description: "The AI-Powered Accounts Payable Command Center",
   icons: {
     icon: [

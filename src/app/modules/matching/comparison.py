@@ -92,7 +92,7 @@ def prepare_comparison_data(db: Session, invoice_db_id: int) -> Dict[str, Any]:
                     models.LearnedHeuristic.vendor_name == invoice.vendor_name,
                     models.LearnedHeuristic.exception_type == exception_type,
                     models.LearnedHeuristic.confidence_score >= 0.8,
-                    models.LearnedHeuristic.resolution_action == 'approved_for_payment'
+                    models.LearnedHeuristic.resolution_action == 'matched'
                 ).order_by(models.LearnedHeuristic.confidence_score.desc()).first()
                 if heuristic:
                     condition_text = ""
@@ -102,6 +102,9 @@ def prepare_comparison_data(db: Session, invoice_db_id: int) -> Dict[str, Any]:
                     suggestion = { "message": f"You have previously approved {condition_text} for {invoice.vendor_name}. This invoice appears to match that pattern.", "action": heuristic.resolution_action, "confidence": heuristic.confidence_score }
 
     return {
+        "invoice_id": invoice.invoice_id,
+        "vendor_name": invoice.vendor_name,
+        "grand_total": invoice.grand_total,
         "line_item_comparisons": comparison_lines,
         "related_pos": related_pos_data,
         "related_grns": [schemas.GoodsReceiptNote.from_orm(grn).model_dump(mode='json') for grn in invoice.grns],

@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 
 from app.db import models
+from app.utils.auditing import log_audit_event
 
 def evaluate_rule(invoice: models.Invoice, rule: models.AutomationRule) -> bool:
     """Evaluates if a single invoice matches the conditions of a single rule."""
@@ -51,8 +52,8 @@ def run_automation_engine(db: Session):
     # or are brand new Non-PO invoices, but not those already deep in review.
     invoices_to_process = db.query(models.Invoice).filter(
         models.Invoice.status.in_([
-            models.DocumentStatus.approved_for_payment, # Rule might auto-pay
-            models.DocumentStatus.pending_match # Rule for non-PO invoices
+            models.DocumentStatus.matched, # Rule might auto-pay
+            models.DocumentStatus.ingested # Rule for non-PO invoices
         ])
     ).all()
 
@@ -76,21 +77,21 @@ def run_automation_engine(db: Session):
                 # 3. Perform the action
                 if rule.action == "approve":
                     # We can directly approve, as it has already passed 3-way match
-                    if invoice.status == models.DocumentStatus.approved_for_payment:
+                    if invoice.status == models.DocumentStatus.matched:
                         invoice.status = models.DocumentStatus.pending_payment
                         action_taken = "Moved to Pending Payment"
-                    else: # It was a Non-PO pending match
-                        invoice.status = models.DocumentStatus.approved_for_payment
-                        action_taken = "Approved for Payment"
+                    elif invoice.status == models.DocumentStatus.ingested: # Non-PO invoice
+                        invoice.status = models.DocumentStatus.matched
+                        action_taken = "Approved Non-PO Invoice"
                         
-                    audit_log = models.AuditLog(
-                        entity_type='Invoice', entity_id=invoice.invoice_id, user='AutomationEngine',
-                        action=action_taken, details={"rule_id": rule.id, "rule_name": rule.rule_name}
-                    )
-                    db.add(audit_log)
-                    processed_count += 1
-                    # Stop checking other rules for this invoice once one has matched
-                    break 
+                    if action_taken:
+                        log_audit_event(
+                            db=db, invoice_db_id=invoice.id, user='AutomationEngine',
+                            action=action_taken, details={"rule_id": rule.id, "rule_name": rule.rule_name}
+                        )
+                        processed_count += 1
+                        # Stop checking other rules for this invoice once one has matched
+                        break 
 
     if processed_count > 0:
         db.commit()

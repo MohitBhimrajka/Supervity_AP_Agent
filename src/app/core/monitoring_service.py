@@ -61,7 +61,7 @@ def check_for_financial_optimizations(db: Session):
     deadline = datetime.now().date() + timedelta(days=3)
     
     invoices_with_discounts = db.query(models.Invoice).filter(
-        models.Invoice.status == models.DocumentStatus.approved_for_payment,
+        models.Invoice.status == models.DocumentStatus.matched,
         models.Invoice.discount_due_date.isnot(None),
         models.Invoice.discount_due_date <= deadline,
         models.Invoice.discount_due_date >= datetime.now().date()

@@ -287,7 +287,7 @@ def get_payment_forecast(db: Session) -> Dict[str, Any]:
         func.count(models.Invoice.id),
         func.sum(models.Invoice.grand_total)
     ).filter(
-        models.Invoice.status == models.DocumentStatus.approved_for_payment,
+        models.Invoice.status == models.DocumentStatus.matched,
         models.Invoice.due_date.isnot(None)
     ).group_by("period").all()
     
@@ -352,7 +352,7 @@ def _update_invoice_status(db: Session, invoice_id: str, new_status: models.Docu
 approve_invoice_declaration = genai_types.FunctionDeclaration(name="approve_invoice", description="Approves an invoice for payment.", parameters=genai_types.Schema(type=genai_types.Type.OBJECT, properties={"invoice_id": genai_types.Schema(type=genai_types.Type.STRING), "reason": genai_types.Schema(type=genai_types.Type.STRING)}))
 def approve_invoice(db: Session, invoice_id: str, reason: str = "Approved via Copilot") -> Dict[str, Any]:
     print(f"Executing tool: approve_invoice for {invoice_id}")
-    return _update_invoice_status(db, invoice_id, models.DocumentStatus.approved_for_payment, reason)
+    return _update_invoice_status(db, invoice_id, models.DocumentStatus.matched, reason)
 
 reject_invoice_declaration = genai_types.FunctionDeclaration(name="reject_invoice", description="Rejects an invoice.", parameters=genai_types.Schema(type=genai_types.Type.OBJECT, properties={"invoice_id": genai_types.Schema(type=genai_types.Type.STRING), "reason": genai_types.Schema(type=genai_types.Type.STRING)}))
 def reject_invoice(db: Session, invoice_id: str, reason: str = "Rejected via Copilot") -> Dict[str, Any]:
@@ -418,7 +418,7 @@ def regenerate_po_pdf(db: Session, po_number: str) -> Dict[str, Any]:
 create_payment_proposal_declaration = genai_types.FunctionDeclaration(name="create_payment_proposal", description="Creates a batch of invoices ready for payment based on vendor or due date.", parameters=genai_types.Schema(type=genai_types.Type.OBJECT, properties={"vendor_name": genai_types.Schema(type=genai_types.Type.STRING), "due_in_days": genai_types.Schema(type=genai_types.Type.INTEGER)}))
 def create_payment_proposal(db: Session, vendor_name: Optional[str] = None, due_in_days: Optional[int] = None) -> Dict[str, Any]:
     print("Executing tool: create_payment_proposal")
-    query = db.query(models.Invoice).filter(models.Invoice.status == models.DocumentStatus.approved_for_payment)
+    query = db.query(models.Invoice).filter(models.Invoice.status == models.DocumentStatus.matched)
     if vendor_name:
         query = query.filter(models.Invoice.vendor_name.ilike(f"%{vendor_name}%"))
     if due_in_days is not None:

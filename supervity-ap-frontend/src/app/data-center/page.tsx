@@ -37,14 +37,14 @@ export default function DataCenterPage() {
     setManualUploadState({ job, isLoading: true });
   };
 
-  const handleSyncJobComplete = () => {
-    toast.success(`Sync job completed!`);
-    setSyncState(prev => ({ ...prev, isLoading: false }));
+  const handleSyncJobComplete = (completedJob: Job) => {
+    toast.success(`Sync job #${completedJob.id} completed!`);
+    setSyncState({ job: completedJob, isLoading: false });
   };
 
-  const handleManualJobComplete = () => {
-    toast.success(`Upload job completed!`);
-    setManualUploadState(prev => ({ ...prev, isLoading: false }));
+  const handleManualJobComplete = (completedJob: Job) => {
+    toast.success(`Upload job #${completedJob.id} completed!`);
+    setManualUploadState({ job: completedJob, isLoading: false });
   };
   
   const clearResults = (type: 'sync' | 'manual') => {

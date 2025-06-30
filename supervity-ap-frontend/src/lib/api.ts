@@ -196,6 +196,9 @@ export type PoHeader = z.infer<typeof PoHeaderSchema>;
 
 // This is the new schema for the main workbench data endpoint
 export const ComparisonDataSchema = z.object({
+  invoice_id: z.string(),
+  vendor_name: z.string().nullable(),
+  grand_total: z.number().nullable(),
   line_item_comparisons: z.array(z.object({
     invoice_line: InvoiceLineItemSchema.nullable(),
     po_line: PoLineItemSchema.nullable(),
@@ -254,6 +257,7 @@ export const AuditLogSchema = z.object({
   timestamp: z.string(),
   user: z.string(),
   action: z.string(),
+  summary: z.string().nullable(),
   details: z.record(z.unknown()).nullable(),
 });
 export type AuditLog = z.infer<typeof AuditLogSchema>;
@@ -266,14 +270,24 @@ const AllAuditLogsSchema = z.array(AuditLogSchema);
  * @param status - The status to filter by (e.g., "needs_review").
  * @returns An array of invoice objects.
  */
-// The getInvoices function is now correctly typed
 export async function getInvoices(status: string): Promise<Invoice[]> {
-    const response = await fetch(`${API_BASE_URL}/invoices/?status=${status}`);
-    if (!response.ok) {
-        throw new Error("Failed to fetch invoices");
-    }
-    const data = await response.json();
-    return AllInvoicesSummarySchema.parse(data);
+  const response = await fetch(`${API_BASE_URL}/invoices?status=${encodeURIComponent(status)}`);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to fetch invoices");
+  }
+  const data = await response.json();
+  return AllInvoicesSummarySchema.parse(data);
+}
+
+export async function getInvoiceByStringId(invoiceIdStr: string): Promise<InvoiceSummary> {
+  const encodedInvoiceId = encodeURIComponent(invoiceIdStr);
+  const response = await fetch(`${API_BASE_URL}/invoices/by-string-id/${encodedInvoiceId}`);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to fetch invoice by ID");
+  }
+  return InvoiceSummarySchema.parse(await response.json());
 }
 
 /**
@@ -291,8 +305,6 @@ export async function getInvoicesForJob(jobId: number): Promise<Invoice[]> {
   return AllInvoicesSummarySchema.parse(data);
 }
 
-
-
 /**
  * Updates the status of an invoice.
  * @param invoiceId - The string-based invoice ID (e.g., INV-AM-98008).
@@ -300,11 +312,11 @@ export async function getInvoicesForJob(jobId: number): Promise<Invoice[]> {
  * @returns Success confirmation.
  */
 interface UpdateStatusPayload {
-    new_status: 'approved_for_payment' | 'rejected';
+    new_status: 'approved_for_payment' | 'rejected' | 'matched' | 'pending_payment';
     reason: string;
 }
 
-export async function updateInvoiceStatus(invoiceId: string, payload: UpdateStatusPayload): Promise<{ success: boolean }> {
+export async function updateInvoiceStatus(invoiceId: string, payload: UpdateStatusPayload): Promise<{ message: string }> {
     // The endpoint in invoices.py is /invoices/{invoice_id}/update-status, where invoice_id is a string
     const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/update-status`, {
         method: 'POST',
@@ -324,7 +336,6 @@ export async function updateInvoiceStatus(invoiceId: string, payload: UpdateStat
     
     return await response.json();
 }
-
 
 // --- NEW WORKBENCH & COLLABORATION FUNCTIONS ---
 
@@ -402,7 +413,7 @@ export async function updateGLCode(invoiceDbId: number, glCode: string): Promise
  * @param invoiceDbId The DATABASE ID of the invoice.
  */
 export async function getInvoiceComments(invoiceDbId: number): Promise<Comment[]> {
-  const response = await fetch(`${API_BASE_URL}/invoices/${invoiceDbId}/comments`);
+  const response = await fetch(`${API_BASE_URL}/workflow/invoices/${invoiceDbId}/comments`);
   if (!response.ok) throw new Error("Failed to fetch comments");
   return AllCommentsSchema.parse(await response.json());
 }
@@ -413,10 +424,10 @@ export async function getInvoiceComments(invoiceDbId: number): Promise<Comment[]
  * @param text The content of the comment.
  */
 export async function addInvoiceComment(invoiceDbId: number, text: string): Promise<Comment> {
-  const response = await fetch(`${API_BASE_URL}/invoices/${invoiceDbId}/comments`, {
+  const response = await fetch(`${API_BASE_URL}/workflow/invoices/${invoiceDbId}/comments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, user: "AP Team" }), // Assume user for now
   });
   if (!response.ok) throw new Error("Failed to add comment");
   return CommentSchema.parse(await response.json());
@@ -427,7 +438,7 @@ export async function addInvoiceComment(invoiceDbId: number, text: string): Prom
  * @param invoiceDbId The DATABASE ID of the invoice.
  */
 export async function getInvoiceAuditLog(invoiceDbId: number): Promise<AuditLog[]> {
-  const response = await fetch(`${API_BASE_URL}/invoices/${invoiceDbId}/audit-log`);
+  const response = await fetch(`${API_BASE_URL}/workflow/invoices/${invoiceDbId}/audit-log`);
   if (!response.ok) throw new Error("Failed to fetch audit log");
   return AllAuditLogsSchema.parse(await response.json());
 }
@@ -561,7 +572,7 @@ export async function getCostRoiMetrics(dateRange: DateRange): Promise<CostRoiMe
 }
 
 // --- UPDATED SEARCH FUNCTION ---
-interface FilterCondition {
+export interface FilterCondition {
     field: string;
     operator: string;
     value: unknown;
@@ -610,7 +621,7 @@ export async function exportToCsv(payload: SearchPayload): Promise<void> {
 
 interface BatchUpdatePayload {
     invoice_ids: number[];
-    new_status: 'approved_for_payment' | 'rejected';
+    new_status: 'approved_for_payment' | 'rejected' | 'matched';
 }
 
 export async function batchUpdateInvoiceStatus(payload: BatchUpdatePayload): Promise<{ message: string }> {
@@ -833,4 +844,53 @@ export async function batchMarkAsPaid(invoice_ids: number[]): Promise<{ message:
         throw new Error(error.detail || "Failed to mark invoices as paid");
     }
     return await response.json();
+}
+
+export async function requestVendorResponse(invoiceDbId: number, message: string): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}/workflow/invoices/${invoiceDbId}/request-vendor-response`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to send to vendor");
+  }
+  return await response.json();
+}
+
+export async function requestInternalResponse(invoiceDbId: number, message: string): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}/workflow/invoices/${invoiceDbId}/request-internal-response`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to send for internal review");
+  }
+  return await response.json();
+}
+
+export async function batchRematchInvoices(invoice_ids: number[]): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/invoices/batch-rematch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoice_ids }),
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || "Failed to trigger re-match");
+    }
+    return await response.json();
+}
+
+export async function getActionQueue(): Promise<InvoiceSummary[]> {
+  const response = await fetch(`${API_BASE_URL}/dashboard/action-queue`);
+  if (!response.ok) {
+    console.error("Failed to fetch action queue");
+    return []; // Return empty array on failure instead of throwing
+  }
+  return AllInvoicesSummarySchema.parse(await response.json());
 }

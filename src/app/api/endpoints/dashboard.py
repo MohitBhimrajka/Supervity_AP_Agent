@@ -3,10 +3,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, Query as SQLQuery
 from sqlalchemy import func, case, desc, cast, Float
 from datetime import datetime, date, timedelta
-from typing import Optional
+from typing import Optional, List
+from collections import Counter
 
 from app.api.dependencies import get_db
-from app.db import models
+from app.db import models, schemas
 
 router = APIRouter()
 
@@ -47,7 +48,7 @@ def get_dashboard_summary(
         "total_invoices": base_query.count(),
         "requires_review": base_query.filter(models.Invoice.status == models.DocumentStatus.needs_review).count(),
         "auto_approved": auto_approved_count,
-        "pending_match": base_query.filter(models.Invoice.status == models.DocumentStatus.pending_match).count(),
+        "pending_match": base_query.filter(models.Invoice.status == models.DocumentStatus.matching).count(),
         # POs and GRNs are not date-filtered as they are master data
         "total_pos": db.query(models.PurchaseOrder).count(),
         "total_grns": db.query(models.GoodsReceiptNote).count(),
@@ -67,7 +68,7 @@ def get_advanced_kpis(
     # --- Current Period Calculations ---
     discounts_captured = base_query.filter(models.Invoice.status == models.DocumentStatus.paid, models.Invoice.paid_date <= models.Invoice.discount_due_date, models.Invoice.discount_amount.isnot(None)).with_entities(func.sum(models.Invoice.discount_amount)).scalar() or 0.0
     
-    total_processed_invoices = base_query.filter(models.Invoice.status.in_([models.DocumentStatus.approved_for_payment, models.DocumentStatus.paid, models.DocumentStatus.needs_review])).count()
+    total_processed_invoices = base_query.filter(models.Invoice.status.in_([models.DocumentStatus.matched, models.DocumentStatus.paid, models.DocumentStatus.needs_review])).count()
     invoices_in_review = base_query.filter(models.Invoice.status == models.DocumentStatus.needs_review).count()
     touchless_invoices = total_processed_invoices - invoices_in_review
     touchless_rate_percent = (touchless_invoices / total_processed_invoices * 100) if total_processed_invoices > 0 else 0.0
@@ -83,7 +84,7 @@ def get_advanced_kpis(
         prev_start_date = prev_end_date - duration
         
         prev_base_query = _get_date_filtered_query(db, models.Invoice, prev_start_date, prev_end_date)
-        prev_total_processed = prev_base_query.filter(models.Invoice.status.in_([models.DocumentStatus.approved_for_payment, models.DocumentStatus.paid, models.DocumentStatus.needs_review])).count()
+        prev_total_processed = prev_base_query.filter(models.Invoice.status.in_([models.DocumentStatus.matched, models.DocumentStatus.paid, models.DocumentStatus.needs_review])).count()
         prev_in_review = prev_base_query.filter(models.Invoice.status == models.DocumentStatus.needs_review).count()
         prev_touchless = prev_total_processed - prev_in_review
         prev_touchless_rate = (prev_touchless / prev_total_processed * 100) if prev_total_processed > 0 else 0.0
@@ -106,23 +107,61 @@ def get_advanced_kpis(
         "vendor_performance": { "top_vendors_by_exception_rate": top_vendors_by_exception }
     }
 
+def _map_trace_to_category(step_name: str, review_category: str) -> Optional[str]:
+    """Maps a raw match trace step to a clean, user-friendly category name."""
+    if review_category == 'missing_document':
+        return "Missing PO / Non-PO"
+    if "Price Match" in step_name:
+        return "Price Mismatch"
+    if "Quantity Match" in step_name:
+        return "Quantity Mismatch"
+    if "PO Item Match" in step_name:
+        return "Item Not on PO"
+    if "Duplicate Check" in step_name:
+        return "Potential Duplicate"
+    if "Timing Check" in step_name:
+        return "Date Mismatch"
+    if "Financials" in step_name:
+        return "Financials Mismatch"
+    return None
+
 @router.get("/exceptions", summary="Get Exception Summary")
 def get_exception_summary(
     db: Session = Depends(get_db),
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None)
 ):
-    """Provides a summary of invoice exceptions by category for a chart, filterable by date."""
+    """
+    Provides a detailed summary of invoice exceptions by parsing the match trace
+    for a more granular chart, filterable by date.
+    """
     base_query = _get_date_filtered_query(db, models.Invoice, start_date, end_date)
-    results = base_query.filter(
-        models.Invoice.status == models.DocumentStatus.needs_review,
-        models.Invoice.review_category.isnot(None)
-    ).with_entities(
-        models.Invoice.review_category,
-        func.count(models.Invoice.id).label('count')
-    ).group_by(models.Invoice.review_category).all()
+    invoices_in_review = base_query.filter(
+        models.Invoice.status == models.DocumentStatus.needs_review
+    ).all()
     
-    return [{"name": row[0].replace('_', ' ').title(), "count": row[1]} for row in results]
+    exception_counts = Counter()
+    
+    for inv in invoices_in_review:
+        found_specific_error = False
+        if inv.match_trace:
+            for step in inv.match_trace:
+                if step.get("status") == "FAIL":
+                    category = _map_trace_to_category(step.get("step", ""), inv.review_category)
+                    if category:
+                        exception_counts[category] += 1
+                        found_specific_error = True
+        
+        # Fallback for invoices that might not have a detailed trace but are in review
+        if not found_specific_error and inv.review_category:
+            fallback_category = inv.review_category.replace('_', ' ').title()
+            exception_counts[fallback_category] += 1
+            
+    # Format for recharts: [{"name": "Category", "count": 5}, ...]
+    # Sort by count descending for a cleaner chart
+    sorted_exceptions = sorted(exception_counts.items(), key=lambda item: item[1], reverse=True)
+    
+    return [{"name": name, "count": count} for name, count in sorted_exceptions]
 
 @router.get("/cost-roi", summary="Get Cost and ROI Metrics")
 def get_cost_roi_metrics(
@@ -147,4 +186,14 @@ def get_cost_roi_metrics(
     
     total_return = time_saved_value + discounts_captured_value
     
-    return { "total_return_for_period": total_return, "total_cost_for_period": agent_expense } 
+    return { "total_return_for_period": total_return, "total_cost_for_period": agent_expense }
+
+@router.get("/action-queue", response_model=List[schemas.InvoiceSummary])
+def get_action_queue(db: Session = Depends(get_db)):
+    """
+    Retrieves the top 5 invoices that require immediate attention,
+    prioritized by the oldest update time in 'needs_review' status.
+    """
+    return db.query(models.Invoice).filter(
+        models.Invoice.status == models.DocumentStatus.needs_review
+    ).order_by(models.Invoice.updated_at.asc()).limit(5).all() 

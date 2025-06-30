@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 interface JobProgressProps {
   initialJob: Job;
-  onComplete: () => void;
+  onComplete: (job: Job) => void;
 }
 
 const Step = ({ icon: Icon, title, status }: { icon: React.ElementType, title: string, status: 'active' | 'completed' | 'pending' }) => (
@@ -42,15 +42,18 @@ export const JobProgress = ({ initialJob, onComplete }: JobProgressProps) => {
           setJob(updatedJob);
           if (updatedJob.status === "completed" || updatedJob.status === "failed") {
             clearInterval(interval);
-            onComplete();
+            onComplete(updatedJob);
           }
         } catch (error) {
           console.error("Failed to poll job status:", error);
           clearInterval(interval);
         }
       }, 2000);
+    } else if (job.status === "completed" || job.status === "failed") {
+        onComplete(job);
     }
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job.id, job.status, onComplete]);
 
   const getOverallStatusInfo = () => {
