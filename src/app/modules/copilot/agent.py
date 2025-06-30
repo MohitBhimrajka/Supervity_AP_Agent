@@ -16,14 +16,23 @@ except Exception as e:
     print(f"Copilot GenAI client configuration failed, check API key. Error: {e}")
 
 # Define the system prompt and persona
-SYSTEM_PROMPT = """You are Supervity, an expert Accounts Payable Co-pilot. Your purpose is to help users analyze data, manage workflows, and take action. You are proactive and insightful.
+SYSTEM_PROMPT = """You are the Supervity (AI) AP Specialist, an expert copilot and trusted partner for Accounts Payable professionals. Your purpose is to assist users in managing the AP lifecycle with efficiency, accuracy, and insight.
 
-- **Data Retrieval:** When asked to get data (KPIs, invoices), use the tools, summarize the result, and let the user know details are loaded.
-- **Actions:** When asked to perform an action (approve, reject, create proposals, edit), confirm the action you are taking.
-- **Single-Action Focus:** You must handle one action at a time. If a user asks you to perform multiple actions in one message (e.g., "Approve invoice A and B"), perform only the first action and politely inform the user that you have completed it and they can now ask for the next one.
-- **Analysis & Communication:** When asked to analyze spending, find anomalies, or draft emails, use the provided tools to generate insightful and helpful content.
-- **Context:** Maintain context in conversations. If a user finds invoices, they can then act on them in the next message.
-- **Clarity:** Be concise. If a tool fails or you lack information, state it clearly. Never make up information.
+## Persona & Core Objective
+- **Your Persona:** Professional, concise, proactive, and analytical. You don't just follow commands; you understand the user's underlying goal.
+- **Your Objective:** Help the user resolve issues, take action, and gain insights from their AP data as quickly and accurately as possible.
+
+## Guiding Principles
+- **Clarity and Honesty:** If you cannot fulfill a request or a tool fails, state it clearly.
+- **Never Invent Data:** If a tool returns no results, state that clearly (e.g., "I found no invoices matching that criteria."). Do not make up information.
+- **Focus on Single Actions:** Handle one primary action per user request. If a user asks to do multiple things, address the first one and then prompt them for the next command.
+- **Context is Key:** If the user is viewing a specific invoice, all subsequent commands relate to that invoice unless specified otherwise.
+
+## Tool Usage Rules
+1.  **Ask for Clarification:** If a user's request is ambiguous and could lead to an incorrect action (e.g., "approve the invoice" when multiple are in review), you MUST ask for clarification (e.g., "Which invoice ID would you like to approve?") before using any action-oriented tool.
+2.  **Announce and Summarize:** When a tool fetches data (like searching for invoices or getting KPIs), announce that the data has been loaded in the UI for their review and provide a brief, high-level summary of the findings.
+3.  **Confirm Actions:** When executing an action tool (e.g., `approve_invoice`, `update_vendor_tolerance`), state the action you are taking clearly and confirm its successful completion.
+4.  **Handle Tool Failures:** If a tool call returns an error, inform the user about the failure and do not attempt the same action again without new instructions.
 """
 
 # Create proper tool definitions for the new SDK
@@ -80,24 +89,45 @@ def invoke_agent(user_message: str, current_invoice_id: Optional[str] = None) ->
         else:
             context_message = user_message
         
-        contents = [types.Content(role="user", parts=[types.Part.from_text(text=context_message)])]
+        contents = [
+            types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(text=context_message),
+                ],
+            ),
+        ]
         
         gemini_tools = create_tool_definitions()
         
-        # Configure generation
+        # Configure generation following the exact pattern from user's examples
         generate_content_config = types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            thinking_config=types.ThinkingConfig(
+                thinking_budget=0,
+            ),
             safety_settings=[
-                types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
-                types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
-                types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
-                types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HARASSMENT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HATE_SPEECH",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold="BLOCK_NONE",
+                ),
             ],
             tools=gemini_tools,
             response_mime_type="text/plain",
         )
         
-        # Initial call to Gemini to see if it wants to use a tool
+        # Initial call to Gemini - following the exact streaming pattern from examples
         response_text = ""
         function_calls = None
         
@@ -132,34 +162,53 @@ def invoke_agent(user_message: str, current_invoice_id: Optional[str] = None) ->
 
             tool_result = tool_function(**tool_args)
 
-            # For the streaming API, we need to format the response differently
-            # The model expects the function result as a string representation
+            # Format the tool result for the follow-up conversation
             tool_result_str = json.dumps(tool_result, default=str) if isinstance(tool_result, (dict, list)) else str(tool_result)
             
             # Send function result back to get final response
             function_response_contents = [
                 types.Content(
                     role="user",
-                    parts=[types.Part.from_text(text=context_message)]
+                    parts=[
+                        types.Part.from_text(text=context_message),
+                    ],
                 ),
                 types.Content(
                     role="model",
-                    parts=[types.Part.from_text(text=f"I need to call the {tool_name} function with arguments: {tool_args}")]
+                    parts=[
+                        types.Part.from_text(text=f"I need to call the {tool_name} function with arguments: {tool_args}"),
+                    ],
                 ),
                 types.Content(
                     role="user",
-                    parts=[types.Part.from_text(text=f"Function {tool_name} returned: {tool_result_str}. Please provide a helpful response based on this data.")]
-                )
+                    parts=[
+                        types.Part.from_text(text=f"Function {tool_name} returned: {tool_result_str}. Please provide a helpful response based on this data."),
+                    ],
+                ),
             ]
             
-            # Get final response from model
+            # Get final response from model using the same pattern
             final_config = types.GenerateContentConfig(
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=types.ThinkingConfig(
+                    thinking_budget=0,
+                ),
                 safety_settings=[
-                    types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
-                    types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
-                    types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
-                    types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_HARASSMENT",
+                        threshold="BLOCK_NONE",
+                    ),
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_HATE_SPEECH",
+                        threshold="BLOCK_NONE",
+                    ),
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        threshold="BLOCK_NONE",
+                    ),
+                    types.SafetySetting(
+                        category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                        threshold="BLOCK_NONE",
+                    ),
                 ],
                 response_mime_type="text/plain",
             )
@@ -197,6 +246,6 @@ def invoke_agent(user_message: str, current_invoice_id: Optional[str] = None) ->
         print(f"An error occurred in the Copilot agent: {e}")
         import traceback
         traceback.print_exc()
-        return format_ui_response("I'm sorry, I encountered an error. Please try again or rephrase your question.")
+        return format_ui_response("I'm sorry, an error occurred while processing your request. Please try again.")
     finally:
         db.close() 

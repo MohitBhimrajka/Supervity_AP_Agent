@@ -36,7 +36,18 @@ def get_system_kpis(db: Session) -> Dict[str, Any]:
     kpis = get_advanced_kpis(db)
     return make_json_serializable(kpis)
 
-search_invoices_declaration = genai_types.FunctionDeclaration(name="search_invoices", description="Searches for invoices with specific filters like status, vendor name, or date range.", parameters=genai_types.Schema(type=genai_types.Type.OBJECT, properties={"status": genai_types.Schema(type=genai_types.Type.STRING), "vendor_name": genai_types.Schema(type=genai_types.Type.STRING), "days_ago": genai_types.Schema(type=genai_types.Type.INTEGER)}))
+search_invoices_declaration = genai_types.FunctionDeclaration(
+    name="search_invoices",
+    description="Searches for invoices with specific filters like status, vendor name, or date range.",
+    parameters=genai_types.Schema(
+        type=genai_types.Type.OBJECT,
+        properties={
+            "status": genai_types.Schema(type=genai_types.Type.STRING),
+            "vendor_name": genai_types.Schema(type=genai_types.Type.STRING),
+            "days_ago": genai_types.Schema(type=genai_types.Type.INTEGER)
+        }
+    )
+)
 def search_invoices(db: Session, status: Optional[str] = None, vendor_name: Optional[str] = None, days_ago: Optional[int] = None) -> List[Dict[str, Any]]:
     print(f"Executing tool: search_invoices with status={status}, vendor={vendor_name}, days_ago={days_ago}")
     query = db.query(models.Invoice)
@@ -78,7 +89,16 @@ def search_invoices(db: Session, status: Optional[str] = None, vendor_name: Opti
     ]
     return make_json_serializable(summary_list)
 
-get_invoice_details_declaration = genai_types.FunctionDeclaration(name="get_invoice_details", description="Retrieves a complete dossier (including related PO and GRN) for a single invoice ID.", parameters=genai_types.Schema(type=genai_types.Type.OBJECT, properties={"invoice_id": genai_types.Schema(type=genai_types.Type.STRING)}))
+get_invoice_details_declaration = genai_types.FunctionDeclaration(
+    name="get_invoice_details",
+    description="Retrieves a complete dossier (including related PO and GRN) for a single invoice ID.",
+    parameters=genai_types.Schema(
+        type=genai_types.Type.OBJECT,
+        properties={
+            "invoice_id": genai_types.Schema(type=genai_types.Type.STRING)
+        }
+    )
+)
 def get_invoice_details(db: Session, invoice_id: str) -> Dict[str, Any]:
     print(f"Executing tool: get_invoice_details for invoice_id={invoice_id}")
     invoice = db.query(models.Invoice).filter(models.Invoice.invoice_id == invoice_id).first()
@@ -87,7 +107,16 @@ def get_invoice_details(db: Session, invoice_id: str) -> Dict[str, Any]:
     return make_json_serializable(dossier)
 
 
-summarize_vendor_issues_declaration = genai_types.FunctionDeclaration(name="summarize_vendor_issues", description="Analyzes and summarizes the most common problems for a specific vendor based on invoice exceptions.", parameters=genai_types.Schema(type=genai_types.Type.OBJECT, properties={"vendor_name": genai_types.Schema(type=genai_types.Type.STRING)}))
+summarize_vendor_issues_declaration = genai_types.FunctionDeclaration(
+    name="summarize_vendor_issues",
+    description="Analyzes and summarizes the most common problems for a specific vendor based on invoice exceptions.",
+    parameters=genai_types.Schema(
+        type=genai_types.Type.OBJECT,
+        properties={
+            "vendor_name": genai_types.Schema(type=genai_types.Type.STRING)
+        }
+    )
+)
 def summarize_vendor_issues(db: Session, vendor_name: str) -> Dict[str, Any]:
     print(f"Executing tool: summarize_vendor_issues for vendor={vendor_name}")
     
@@ -124,7 +153,19 @@ def summarize_vendor_issues(db: Session, vendor_name: str) -> Dict[str, Any]:
     return make_json_serializable(result)
 
 
-flag_potential_anomalies_declaration = genai_types.FunctionDeclaration(name="flag_potential_anomalies", description="Scans recent invoices to detect potential anomalies like duplicate payments or unusual spending.", parameters=genai_types.Schema(type=genai_types.Type.OBJECT, properties={"days_ago": genai_types.Schema(type=genai_types.Type.INTEGER, description="How many days back to scan. Defaults to 7.")}))
+flag_potential_anomalies_declaration = genai_types.FunctionDeclaration(
+    name="flag_potential_anomalies",
+    description="Scans recent invoices to detect potential anomalies like duplicate payments or unusual spending.",
+    parameters=genai_types.Schema(
+        type=genai_types.Type.OBJECT,
+        properties={
+            "days_ago": genai_types.Schema(
+                type=genai_types.Type.INTEGER,
+                description="How many days back to scan. Defaults to 7."
+            )
+        }
+    )
+)
 def flag_potential_anomalies(db: Session, days_ago: int = 7) -> Dict[str, Any]:
     print("Executing tool: flag_potential_anomalies")
     start_date = datetime.now() - timedelta(days=days_ago)
@@ -145,7 +186,19 @@ def flag_potential_anomalies(db: Session, days_ago: int = 7) -> Dict[str, Any]:
     # A real implementation would use standard deviation over a longer period
     return {"found_anomalies": anomalies if anomalies else "No obvious anomalies found in the last 7 days."}
 
-analyze_spending_by_category_declaration = genai_types.FunctionDeclaration(name="analyze_spending_by_category", description="Analyzes invoice line items to break down spending by category for a given period.", parameters=genai_types.Schema(type=genai_types.Type.OBJECT, properties={"period": genai_types.Schema(type=genai_types.Type.STRING, description="e.g., 'last month', 'last quarter', 'last 7 days'")}))
+analyze_spending_by_category_declaration = genai_types.FunctionDeclaration(
+    name="analyze_spending_by_category",
+    description="Analyzes invoice line items to break down spending by category for a given period.",
+    parameters=genai_types.Schema(
+        type=genai_types.Type.OBJECT,
+        properties={
+            "period": genai_types.Schema(
+                type=genai_types.Type.STRING,
+                description="e.g., 'last month', 'last quarter', 'last 7 days'"
+            )
+        }
+    )
+)
 def analyze_spending_by_category(db: Session, client: Any, period: str = "last month") -> Dict[str, Any]:
     print(f"Executing tool: analyze_spending_by_category for period: {period}")
     today = datetime.now()
@@ -175,17 +228,33 @@ Items:
         contents = [
             types.Content(
                 role="user",
-                parts=[types.Part.from_text(text=prompt)]
-            )
+                parts=[
+                    types.Part.from_text(text=prompt),
+                ],
+            ),
         ]
         
         generate_content_config = types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            thinking_config=types.ThinkingConfig(
+                thinking_budget=0,
+            ),
             safety_settings=[
-                types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
-                types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
-                types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
-                types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HARASSMENT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HATE_SPEECH",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold="BLOCK_NONE",
+                ),
             ],
             response_mime_type="application/json",
         )
@@ -377,9 +446,23 @@ def create_payment_proposal(db: Session, vendor_name: Optional[str] = None, due_
         "invoices_in_batch": invoice_ids
     }
 
-draft_vendor_communication_declaration = genai_types.FunctionDeclaration(name="draft_vendor_communication", description="Drafts an email to a vendor regarding an invoice issue (e.g., mismatch, missing document).", parameters=genai_types.Schema(type=genai_types.Type.OBJECT, properties={"invoice_id": genai_types.Schema(type=genai_types.Type.STRING), "reason": genai_types.Schema(type=genai_types.Type.STRING, description="The reason for the email, e.g., 'Price mismatch', 'Request credit note for quantity difference'")}))
+draft_vendor_communication_declaration = genai_types.FunctionDeclaration(
+    name="draft_vendor_communication", 
+    description="Drafts a professional email to a vendor about an invoice issue. The user should provide the core reason for the communication.", 
+    parameters=genai_types.Schema(
+        type=genai_types.Type.OBJECT, 
+        properties={
+            "invoice_id": genai_types.Schema(type=genai_types.Type.STRING), 
+            "reason": genai_types.Schema(
+                type=genai_types.Type.STRING, 
+                description="The specific user-provided reason for the email, e.g., 'Please provide a credit note for the quantity difference' or 'Clarify the extra charges.'"
+            )
+        }
+    )
+)
+
 def draft_vendor_communication(db: Session, client: Any, invoice_id: str, reason: str) -> Dict[str, Any]:
-    print(f"Executing tool: draft_vendor_communication for {invoice_id}")
+    print(f"Executing tool: draft_vendor_communication for {invoice_id} with reason: {reason}")
     dossier = get_invoice_details(db, invoice_id)
     if dossier.get("error"):
         return dossier
@@ -388,25 +471,31 @@ def draft_vendor_communication(db: Session, client: Any, invoice_id: str, reason
     vendor_setting = db.query(models.VendorSetting).filter_by(vendor_name=vendor_name).first()
     vendor_email = vendor_setting.contact_email if vendor_setting else "vendor_contact@example.com"
     
-    context = json.dumps(dossier, indent=2)
+    # Provide the match trace as structured context for the AI
+    match_trace_context = json.dumps(dossier.get("match_trace", "No trace available."), indent=2)
+    
     prompt = f"""You are a professional Accounts Payable specialist.
 Your task is to draft a clear and polite email to a vendor regarding an issue with an invoice.
 
 **Recipient Email:** {vendor_email}
-**Subject:** Issue with Invoice {invoice_id}
+**Subject:** Query regarding Invoice {invoice_id}
 
-**Context (JSON data for the invoice, PO, and GRN):**
-{context}
+**User's Goal for this Email:**
+"{reason}"
+
+**Evidence (Technical Match Trace - use this to find specific mismatches):**
+{match_trace_context}
 
 **Instructions:**
-Based on the JSON data above and the reason for contact provided below, draft the email.
-- Be specific. Mention PO numbers, invoice numbers, item descriptions, and the exact discrepancy (e.g., quantities, prices).
-- Maintain a professional and collaborative tone.
-- Clearly state the action required from the vendor (e.g., "please issue a credit note for...", "please provide a corrected invoice...").
+1.  Start with a polite opening.
+2.  Clearly state the user's goal based on the reason provided.
+3.  Use the evidence from the match trace to find specific discrepancies (e.g., item names, price/quantity differences) and mention them in the email to support the user's request.
+4.  If the trace shows a "Price Mismatch," specify the item, the invoice price, and the PO price.
+5.  If the trace shows a "Quantity Mismatch," specify the item, the billed quantity, and the received/ordered quantity.
+6.  Conclude with a clear call to action (e.g., "Please provide a corrected invoice," "Please issue a credit note for the difference.").
+7.  Maintain a professional and collaborative tone.
 
-**Reason for contact:** "{reason}"
-
-Draft the email now.
+Draft the email body now.
 """
 
     try:
@@ -415,17 +504,33 @@ Draft the email now.
         contents = [
             types.Content(
                 role="user",
-                parts=[types.Part.from_text(text=prompt)]
-            )
+                parts=[
+                    types.Part.from_text(text=prompt),
+                ],
+            ),
         ]
         
         generate_content_config = types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            thinking_config=types.ThinkingConfig(
+                thinking_budget=0,
+            ),
             safety_settings=[
-                types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
-                types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
-                types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
-                types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HARASSMENT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_HATE_SPEECH",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    threshold="BLOCK_NONE",
+                ),
+                types.SafetySetting(
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold="BLOCK_NONE",
+                ),
             ],
             response_mime_type="text/plain",
         )

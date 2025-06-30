@@ -2,9 +2,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.db.models import Base
+from app.config import settings
 
 # The database URL for a local SQLite file
-SQLALCHEMY_DATABASE_URL = "sqlite:///./ap_data.db"
+SQLALCHEMY_DATABASE_URL = settings.database_url
 
 # The engine is the main point of contact with the DB
 engine = create_engine(

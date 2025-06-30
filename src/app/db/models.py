@@ -197,6 +197,10 @@ class Invoice(Base):
     # --- END MODIFICATION ---
     
     status = Column(Enum(DocumentStatus), default=DocumentStatus.pending_match, nullable=False)
+    
+    # --- ADD THIS NEW FIELD ---
+    review_category = Column(String, nullable=True) # e.g., 'data_mismatch', 'missing_document', 'policy_violation'
+    
     ai_recommendation = Column(JSON, nullable=True)
     file_path = Column(String, nullable=True)
     
@@ -211,6 +215,9 @@ class Invoice(Base):
     discount_amount = Column(Float, nullable=True)
     discount_due_date = Column(Date, nullable=True)
     paid_date = Column(Date, nullable=True)
+    
+    # --- ADD THIS NEW COLUMN ---
+    payment_batch_id = Column(String, index=True, nullable=True)
     
     # Timestamps for KPI calculation
     created_at = Column(DateTime, default=datetime.utcnow)

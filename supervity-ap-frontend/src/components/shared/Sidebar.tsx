@@ -1,18 +1,28 @@
 "use client"; // This component now uses a hook, so it must be a client component
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FileUp, GanttChartSquare, Bot, Route, Cog, Banknote } from "lucide-react";
+import { 
+  LayoutDashboard, 
+  GanttChartSquare, 
+  DatabaseZap, // New Icon for Data Center
+      ClipboardList, // New Icon for Invoice Manager
+  SlidersHorizontal, // New Icon for Configuration
+  Sparkles // New Icon for Automation
+} from "lucide-react";
 
+// New navigation structure (Copilot removed)
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/document-hub", icon: FileUp, label: "Document Hub" },
-  { href: "/ap-workbench", icon: GanttChartSquare, label: "AP Workbench" },
-  { href: "/super-agent", icon: Bot, label: "Super Agent" },
-  { href: "/invoice-explorer", icon: Route, label: "Invoice Explorer" },
-  { href: "/ai-policy", icon: Cog, label: "AI Policy" },
-  { href: "/payment-proposal", icon: Banknote, label: "Payment Proposal" },
+  { href: "/data-center", icon: DatabaseZap, label: "Data Center" },
+      { href: "/invoice-explorer", icon: ClipboardList, label: "Invoice Manager" },
+  { href: "/resolution-workbench", icon: GanttChartSquare, label: "Resolution Workbench" },
+  // --- MODIFIED SECTION ---
+  { href: "/learned-insights", icon: Sparkles, label: "Automation" },
+  { href: "/settings", icon: SlidersHorizontal, label: "Configuration" },
+  // --- END MODIFICATION ---
 ];
 
 export const Sidebar = () => {
@@ -20,7 +30,17 @@ export const Sidebar = () => {
 
   return (
     <aside className="w-64 bg-blue-primary text-white p-4 flex flex-col shrink-0">
-      <div className="text-2xl font-bold mb-10 text-center">Supervity</div>
+      <div className="mb-10 px-4">
+        <Link href="/dashboard">
+            <Image
+                src="/logo.svg"
+                alt="Supervity Logo"
+                width={150}
+                height={40}
+                priority
+            />
+        </Link>
+      </div>
       <nav>
         <ul>
           {navItems.map((item) => (
@@ -28,8 +48,10 @@ export const Sidebar = () => {
               <Link
                 href={item.href}
                 className={cn(
-                  "flex items-center p-3 rounded-lg text-sm font-medium transition-transform duration-200 ease-in-out hover:bg-blue-light/20 hover:translate-x-1",
-                  pathname.startsWith(item.href) ? "bg-white/10 text-white" : "text-gray-100"
+                  "flex items-center p-3 rounded-lg text-sm font-medium transition-transform duration-200 ease-in-out hover:bg-white/20 hover:translate-x-1",
+                  pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/')
+                    ? "bg-white/10 text-white font-semibold" 
+                    : "text-gray-200 hover:text-white"
                 )}
               >
                 <item.icon className="mr-3 h-5 w-5" />

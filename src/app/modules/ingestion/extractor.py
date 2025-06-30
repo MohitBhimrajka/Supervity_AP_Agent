@@ -15,22 +15,30 @@ try:
 except Exception as e:
     print(f"Ingestion GenAI client configuration failed, check API key. Error: {e}")
 
-EXTRACTION_PROMPT = """You are an expert Accounts Payable data entry specialist. Analyze the attached PDF document. First, identify the document type from the following options: Purchase Order, Goods Receipt Note, Vendor Invoice.
+EXTRACTION_PROMPT = """You are an elite Accounts Payable data extraction engine. Your task is to analyze the attached document with extreme precision and return ONLY a single, minified JSON object. Adhere to these critical rules:
 
-Based on the identified type, extract all key information and return it ONLY as a single, minified JSON object. Do not include any other text, explanations, or markdown. Use `null` for any fields you cannot find. Dates must be in YYYY-MM-DD format.
+**Your Process:**
+1.  **Identify Document Type:** First, classify the document as one of: "Purchase Order", "Goods Receipt Note", "Invoice", or "Error".
+2.  **Extract Data:** Based on the type, extract all available fields according to the corresponding schema below.
+3.  **Strict Data Typing:** Before outputting the JSON, double-check your work.
+    -   **Dates MUST be in "YYYY-MM-DD" format.** (e.g., "2024-03-15").
+    -   **Numbers MUST be pure numeric types (integer or float), not strings.** (e.g., 1800.00, not "$1,800.00" or "1,800").
+    -   Use `null` for any field you cannot find.
+4.  **Output JSON:** Provide only the final JSON object. Do not include any other text, explanations, or markdown formatting.
 
-Your JSON output MUST conform to one of the following schemas:
+**JSON Schemas:**
 
-1. If Purchase Order:
-{"document_type": "Purchase Order", "po_number": "string", "vendor_name": "string", "buyer_name": "string", "order_date": "YYYY-MM-DD", "line_items": [{"description": "string", "ordered_qty": float, "unit_price": float, "sku": "string | null"}]}
+**1. If Purchase Order:**
+{"document_type": "Purchase Order", "po_number": "string", "vendor_name": "string", "buyer_name": "string", "order_date": "YYYY-MM-DD", "line_items": [{"description": "string", "ordered_qty": float, "unit_price": float, "sku": "string | null", "unit": "string | null"}], "subtotal": float | null, "tax": float | null, "grand_total": float | null}
 
-2. If Goods Receipt Note:
-{"document_type": "Goods Receipt Note", "grn_number": "string", "po_number": "string", "received_date": "YYYY-MM-DD", "line_items": [{"description": "string", "received_qty": float, "sku": "string | null"}]}
+**2. If Goods Receipt Note:**
+{"document_type": "Goods Receipt Note", "grn_number": "string", "po_number": "string", "received_date": "YYYY-MM-DD", "line_items": [{"description": "string", "received_qty": float, "sku": "string | null", "unit": "string | null"}]}
 
-3. If Vendor Invoice:
-{"document_type": "Invoice", "invoice_id": "string", "vendor_name": "string", "related_po_numbers": ["string"], "related_grn_numbers": ["string"], "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "line_items": [{"description": "string", "quantity": float, "unit_price": float, "line_total": float, "sku": "string | null", "po_number": "string | null"}], "subtotal": float, "tax": float, "grand_total": float, "discount_terms": "string | null", "discount_amount": float | null, "discount_due_date": "YYYY-MM-DD | null"}
+**3. If Vendor Invoice:**
+{"document_type": "Invoice", "invoice_id": "string", "vendor_name": "string", "related_po_numbers": ["string"], "related_grn_numbers": ["string"], "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "line_items": [{"description": "string", "quantity": float, "unit_price": float, "line_total": float, "sku": "string | null", "po_number": "string | null", "unit": "string | null"}], "subtotal": float | null, "tax": float | null, "grand_total": float | null, "discount_terms": "string | null", "discount_amount": float | null, "discount_due_date": "YYYY-MM-DD | null"}
 
-IMPORTANT: For Invoices, extract all PO numbers and GRN numbers you can find in the document into the `related_po_numbers` and `related_grn_numbers` arrays. If a specific line item references a PO number, extract it into the `po_number` field for that line item."""
+**4. If Unreadable or Not an AP Document:**
+{"document_type": "Error", "error_message": "The document is illegible, password-protected, or not a recognizable AP document type."}"""
 
 def extract_data_from_pdf(pdf_content: bytes) -> Optional[Dict]:
     """

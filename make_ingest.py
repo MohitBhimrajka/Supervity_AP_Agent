@@ -79,6 +79,8 @@ def generate_digest_cli(source, output_file="digest.txt", exclude_exts=None):
         "supervity-ap-frontend/pnpm-lock.yaml",
         "supervity-ap-frontend/.next",
         "supervity-ap-frontend/.next/*",
+        "supervity-ap-frontend/public",
+        "supervity-ap-frontend/public/*",
         "supervity-ap-frontend/.nuxt",
         "supervity-ap-frontend/.nuxt/*",
         "supervity-ap-frontend/out",

@@ -7,10 +7,10 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-[#000b37]/10 text-[#000b37] border-transparent",
-        success: "bg-[#85c20b]/10 text-[#85c20b] border-transparent",
-        warning: "bg-[#ff9a5a]/10 text-[#ff9a5a] border-transparent",
-        destructive: "bg-[#ff94a8]/10 text-[#ff94a8] border-transparent",
+        default: "bg-gray-medium/10 text-gray-dark border-transparent",
+        success: "bg-green-success/10 text-green-success border-transparent",
+        warning: "bg-orange-warning/10 text-orange-warning border-transparent",
+        destructive: "bg-pink-destructive/10 text-pink-destructive border-transparent",
       },
     },
     defaultVariants: {

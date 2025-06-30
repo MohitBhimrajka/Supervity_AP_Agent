@@ -44,7 +44,7 @@ class JobBase(BaseModel):
     status: Optional[str] = "processing"
     total_files: Optional[int] = 0
     processed_files: Optional[int] = 0
-    summary: Optional[Dict[str, Any]] = None
+    summary: Optional[List[Dict[str, Any]]] = None
 
 class AuditLogBase(BaseModel):
     entity_type: str
@@ -115,6 +115,21 @@ class Invoice(InvoiceBase):
     class Config:
         from_attributes = True
 
+# --- ADD NEW LIGHTWEIGHT SCHEMA FOR LIST VIEWS ---
+class InvoiceSummary(BaseModel):
+    """A lightweight schema for invoice list views."""
+    id: int
+    invoice_id: str
+    vendor_name: Optional[str] = None
+    grand_total: Optional[float] = None
+    status: DocumentStatus
+    invoice_date: Optional[date] = None
+    review_category: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+# --- END NEW SCHEMA ---
+
 class PurchaseOrder(PurchaseOrderBase):
     id: int
     
@@ -172,6 +187,8 @@ class FilterCondition(BaseModel):
 
 class SearchRequest(BaseModel):
     filters: List[FilterCondition]
+    sort_by: Optional[str] = 'invoice_date'  # Add sort_by
+    sort_order: Optional[str] = 'desc'       # Add sort_order
 
 # --- NEW CONFIGURATION SCHEMAS ---
 

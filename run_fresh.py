@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fresh start script for the Supervity AP Agent.
+Fresh start script for the Supervity AP Command Center.
 This script:
 1. Clears the database
 2. Initializes configuration data
@@ -33,7 +33,7 @@ def run_script(script_path, args=None):
 
 def main():
     """Main function to orchestrate the fresh start process."""
-    print("🚀 SUPERVITY AP AGENT - FRESH START")
+    print("🚀 SUPERVITY AP COMMAND CENTER - FRESH START")
     print("=" * 50)
     print("This will:")
     print("1. Clean the database")
@@ -70,7 +70,7 @@ def main():
         print("\n📝 STEP 3: Starting Application")
         print("-" * 30)
         print("🎉 Database is clean and configured!")
-        print("🚀 Starting the Supervity AP Agent server...")
+        print("🚀 Starting the Supervity AP Command Center server...")
         print("\n" + "=" * 50)
         
         # Run the main application (this will block)

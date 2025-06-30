@@ -47,9 +47,9 @@ async def lifespan(app: FastAPI):
 
 # --- MODIFIED APP INITIALIZATION ---
 app = FastAPI(
-    title="Supervity AP Agent API", # <-- RENAMED
-    description="API for an AI-powered Accounts Payable processing system.",
-    version="4.2.0", # Version bump
+    title="Supervity AP Command Center API", # <-- RENAMED
+    description="The backend API for the Supervity AI-powered Accounts Payable Command Center.",
+    version="2.0.0", # Version bump for new release
     lifespan=lifespan # Use the new lifespan manager
 )
 
@@ -66,14 +66,10 @@ app.add_middleware(
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents & Jobs"])
 app.include_router(invoices.router, prefix="/api/invoices", tags=["Invoices"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
-# --- INCLUDE THE NEW COPILOT ROUTER ---
-app.include_router(copilot.router, prefix="/api/copilot", tags=["Copilot"])
-# --- NEW LEARNING ROUTER ---
+app.include_router(copilot.router, prefix="/api/copilot", tags=["AP Copilot"]) # <-- RENAMED TAG
 app.include_router(learning.router, prefix="/api/learning", tags=["Learning & Heuristics"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
-# --- NEW CONFIGURATION ROUTER ---
-app.include_router(configuration.router, prefix="/api/config", tags=["Configuration"])
-# ADD THIS LINE
+app.include_router(configuration.router, prefix="/api/config", tags=["Configuration & Settings"]) # <-- RENAMED TAG
 app.include_router(collaboration.router, prefix="/api", tags=["Collaboration"])
 app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
 

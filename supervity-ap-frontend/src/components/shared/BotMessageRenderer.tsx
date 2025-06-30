@@ -1,9 +1,10 @@
 "use client";
 
 import ReactMarkdown from 'react-markdown';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/Table';
-import { Badge } from '../ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Eye } from 'lucide-react';
+import { useAppContext } from '@/lib/AppContext';
 
 interface BotMessageRendererProps {
   content: string;
@@ -12,80 +13,51 @@ interface BotMessageRendererProps {
 }
 
 export const BotMessageRenderer = ({ content, uiAction, data }: BotMessageRendererProps) => {
-  const renderData = () => {
-    switch (uiAction) {
-      case 'DISPLAY_JSON':
-        return (
-          <Card className="mt-4 bg-gray-50">
-            <CardHeader><CardTitle className="text-base">Data Received</CardTitle></CardHeader>
-            <CardContent>
-              <pre className="bg-gray-200 p-3 rounded text-xs overflow-x-auto text-gray-800">
-                {JSON.stringify(data, null, 2)}
-              </pre>
-            </CardContent>
-          </Card>
-        );
+  const { openCanvas } = useAppContext();
 
-      case 'LOAD_DATA':
-        if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object') {
-          return (
-            <Card className="mt-4 bg-gray-50">
-              <CardContent className="pt-4">
-                <div className="max-h-72 overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {Object.keys(data[0]).slice(0, 4).map((key) => (
-                          <TableHead key={key} className="text-xs text-gray-600">
-                            {key.replace(/_/g, ' ').toUpperCase()}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.map((item: Record<string, unknown>, index: number) => (
-                        <TableRow key={index}>
-                          {Object.entries(item).slice(0, 4).map(([key, value]) => (
-                            <TableCell key={key} className="text-xs">
-                              {key === 'status' ? (
-                                <Badge variant="default" className="text-xs">
-                                  {String(value).replace(/_/g, ' ')}
-                                </Badge>
-                              ) : (String(value) || 'N/A')}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        }
-        return null;
+  const handleViewData = () => {
+    if (!data) return;
+    openCanvas({
+      title: "Copilot Data Results",
+      type: "data",
+      data: data,
+    });
+  };
 
-      case 'DISPLAY_MARKDOWN':
-        return (
-          <Card className="mt-4 bg-gray-50">
-            <CardHeader><CardTitle className="text-base">Generated Draft</CardTitle></CardHeader>
-            <CardContent>
-              <div className="prose prose-sm max-w-none text-gray-800 bg-white p-4 rounded border">
-                <ReactMarkdown>{(data as { draft_email?: string })?.draft_email || ''}</ReactMarkdown>
-              </div>
-            </CardContent>
-          </Card>
-        );
-        
-      default:
-        return null;
+  const renderDataAction = () => {
+    // These actions now open the side canvas
+    if (uiAction === 'LOAD_DATA' || uiAction === 'DISPLAY_JSON') {
+      return (
+        <div className="mt-4">
+          <Button variant="secondary" onClick={handleViewData}>
+            <Eye className="mr-2 h-4 w-4" />
+            View Data
+          </Button>
+        </div>
+      );
     }
+    
+    // This action still renders inline as it's typically just text
+    if (uiAction === 'DISPLAY_MARKDOWN') {
+      return (
+        <Card className="mt-4 bg-gray-50">
+          <CardHeader><CardTitle className="text-base">Generated Draft</CardTitle></CardHeader>
+          <CardContent>
+            <div className="prose prose-sm max-w-none text-gray-dark bg-white p-4 rounded border">
+              <ReactMarkdown>{(data as { draft_email?: string })?.draft_email || ''}</ReactMarkdown>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return null;
   };
 
   return (
     <div>
-      <p className="text-gray-800">{content}</p>
-      {renderData()}
+      <p className="text-gray-dark">{content}</p>
+      {renderDataAction()}
     </div>
   );
 }; 

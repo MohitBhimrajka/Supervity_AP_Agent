@@ -10,12 +10,4 @@ pymupdf>=1.23.9
 python-dateutil>=2.8.2
 reportlab==4.2.0
 Faker==25.2.0
-thefuzz[speedup]>=0.20.0
-
-# Streamlit frontend dependencies
-streamlit>=1.44.0
-requests>=2.32.0
-pandas>=2.2.0
-pdf2image>=1.16.3
-Pillow>=10.1.0
-plotly>=5.17.0 
+thefuzz[speedup]>=0.20.0 

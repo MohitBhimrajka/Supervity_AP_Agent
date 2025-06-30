@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main startup script for the Supervity AP Agent.
+Main startup script for the Supervity AP Command Center.
 This script sets up the path and runs the FastAPI application using uvicorn.
 """
 import sys
@@ -13,7 +13,7 @@ def main():
     # This allows us to import 'app' as a top-level module
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 
-    print("🚀 Starting Supervity AP Agent API server...")
+    print("🚀 Starting Supervity AP Command Center API server...")
     print("API Documentation will be available at: http://127.0.0.1:8000/docs")
     print("API Root endpoint: http://127.0.0.1:8000/")
     print("\nPress Ctrl+C to stop the server")

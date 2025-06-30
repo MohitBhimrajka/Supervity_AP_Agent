@@ -22,6 +22,9 @@ export const CollaborateAuditTab = ({ invoiceDbId, invoiceId, vendorName }: Coll
     const [isLoading, setIsLoading] = useState(true);
     const [draftEmail, setDraftEmail] = useState<string | null>(null);
     const [isDrafting, setIsDrafting] = useState(false);
+    
+    // --- NEW STATE FOR EMAIL REASON ---
+    const [emailReason, setEmailReason] = useState("");
 
     useEffect(() => {
         const fetchData = async () => {
@@ -55,14 +58,18 @@ export const CollaborateAuditTab = ({ invoiceDbId, invoiceId, vendorName }: Coll
     };
 
     const handleDraftEmail = async () => {
+        if (!emailReason.trim()) {
+            toast.error("Please provide a reason for the email.");
+            return;
+        }
         setIsDrafting(true);
         setDraftEmail(null);
         try {
+            // --- MODIFIED COPILOT CALL ---
             const response = await postToCopilot({
-                message: `Draft a polite but firm email to the vendor ${vendorName} regarding all discrepancies found in invoice ${invoiceId}. Clearly state the issues and the required actions.`,
+                message: `Draft an email to vendor ${vendorName} for invoice ${invoiceId}. The reason is: ${emailReason}`,
                 current_invoice_id: invoiceId
             });
-            // The tool returns data in a specific shape, let's extract it.
             if (response.uiAction === 'DISPLAY_MARKDOWN' && typeof response.data === 'object' && response.data && 'draft_email' in response.data) {
                 setDraftEmail(response.data.draft_email as string);
                 toast.success("Email draft generated!");
@@ -82,16 +89,25 @@ export const CollaborateAuditTab = ({ invoiceDbId, invoiceId, vendorName }: Coll
     if (isLoading) return <div>Loading...</div>
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
             <div className="space-y-6">
                 <Card>
                     <CardHeader>
                         <CardTitle>Vendor Communication</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <Button onClick={handleDraftEmail} disabled={isDrafting}>
+                    {/* --- NEW UI FOR DRAFTING EMAIL --- */}
+                    <CardContent className="space-y-3">
+                        <div>
+                            <label className="text-sm font-medium text-gray-800">Reason for Contact</label>
+                            <Textarea 
+                                value={emailReason} 
+                                onChange={e => setEmailReason(e.target.value)}
+                                placeholder="e.g., 'Please issue a credit note for the short-shipped items.'"
+                            />
+                        </div>
+                        <Button onClick={handleDraftEmail} disabled={isDrafting || !emailReason.trim()}>
                             {isDrafting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Mail className="mr-2 h-4 w-4"/>}
-                            {isDrafting ? "Thinking..." : "Draft Email for Discrepancies"}
+                            {isDrafting ? "Thinking..." : "Draft Email"}
                         </Button>
                         {draftEmail && (
                             <div className="mt-4 p-4 border rounded-lg bg-gray-50 text-sm prose max-w-none">

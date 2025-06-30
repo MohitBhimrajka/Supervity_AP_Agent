@@ -1,21 +1,18 @@
-# Supervity AP Agent: An AI-Powered Accounts Payable Copilot
+# Supervity AP Command Center: An AI-Powered Accounts Payable Platform
 
-This project is an advanced, AI-powered Accounts Payable (AP) automation platform. It goes beyond simple data extraction by providing a sophisticated **AP Copilot**, built with Google's Gemini Pro, that allows users to analyze data, manage workflows, and take action using natural language.
+This project is an advanced, AI-powered Accounts Payable (AP) automation platform. It goes beyond simple data extraction by providing a sophisticated **AP Copilot**, built with Google's Gemini, that allows users to analyze data, manage workflows, and take action using natural language.
 
-The system ingests invoices, purchase orders (POs), and goods receipt notes (GRNs), performs automated 3-way matching, and flags exceptions for review. The AP Copilot then acts as an intelligent assistant for the AP team to resolve these issues, optimize payments, and gain strategic insights.
+The system ingests invoices, purchase orders (POs), and goods receipt notes (GRNs), performs automated 3-way matching, and flags exceptions for review in the **Resolution Workbench**. The AP Copilot then acts as an intelligent assistant for the AP team to resolve these issues, optimize payments, and gain strategic insights.
 
 ## 🚀 Key Features
 
 *   **Intelligent Document Processing (IDP):** Ingests PDF documents (Invoices, POs, GRNs) and uses Gemini AI to extract structured data with high accuracy.
 *   **Automated 3-Way Matching:** A robust matching engine validates invoices against POs and GRNs, checking for mismatches in price, quantity, items, and more.
 *   **Comprehensive Exception Handling:** Automatically flags invoices with issues like price/quantity discrepancies, missing documents, duplicates, and policy violations.
-*   **Conversational AI Copilot:** A stateful, tool-augmented agent that understands user intent and can:
-    *   **Retrieve Data:** Answer complex questions about invoices, vendors, and system performance.
-    *   **Take Action:** Approve/reject invoices, edit POs, and update vendor settings directly from chat.
-    *   **Analyze & Forecast:** Provide spending analysis, cash flow forecasts, and anomaly detection.
-    *   **Automate Communication:** Draft vendor emails for dispute resolution.
-*   **Advanced KPI Dashboard:** Real-time visibility into critical AP metrics, including processing times, touchless rates, and financial optimization opportunities like early payment discounts.
-*   **RESTful API:** A clean, well-documented FastAPI backend for seamless integration with any frontend.
+*   **Conversational AI Copilot:** A stateful, tool-augmented agent that understands user intent and can resolve issues, take actions, and analyze data.
+*   **Adaptive Learning:** The system learns from user actions to create heuristics, which can be promoted into permanent automation rules.
+*   **Modern Web Interface:** A responsive Next.js frontend with a dashboard, resolution workbench, and configuration settings.
+*   **RESTful API:** A clean, well-documented FastAPI backend for seamless integration.
 
 ## 🤖 The AP Copilot: Your Intelligent Assistant
 
@@ -59,14 +56,14 @@ The heart of the system is the AP Copilot. It's designed to understand the conte
 
 ### 1. Prerequisites
 *   Python 3.10+
+*   Node.js and npm (or yarn/pnpm)
 *   A Google Gemini API Key
 
-### 2. Installation
+### 2. Backend Setup
    - **Get your API key:** Get your key from [Google AI Studio](https://makersuite.google.com/app/apikey).
-   - **Create a `.env` file** in the project root by copying `.env.example` (if provided) or creating it from scratch.
-   - **Add your API key** to the `.env` file:
+   - **Create a `.env` file** in the project root (`Supervity_AP_Agent/`) and add your API key:
      ```
-     GOOGLE_API_KEY="your_actual_api_key_here"
+     GEMINI_API_KEY="your_actual_api_key_here"
      ```
    - **Create and activate a virtual environment:**
      ```bash
@@ -74,105 +71,101 @@ The heart of the system is the AP Copilot. It's designed to understand the conte
      source venv/bin/activate  # On macOS/Linux
      # venv\Scripts\activate     # On Windows
      ```
-   - **Install dependencies:**
+   - **Install Python dependencies:**
      ```bash
      pip install -r requirements.txt
      ```
 
-### 3. Database Setup
-   - The application uses SQLite and will create the `ap_data.db` file automatically.
-   - To start with a clean slate, you can reset the database at any time:
+### 3. Frontend Setup
+   - **Navigate to the frontend directory:**
      ```bash
-     python scripts/cleanup_db.py --reset
+     cd supervity-ap-frontend
+     ```
+   - **Install Node.js dependencies:**
+     ```bash
+     npm install
+     ```
+   - **Return to the root directory:**
+     ```bash
+     cd ..
      ```
 
-### 4. Running the Server
+### 4. Running the Application
 
-#### Option A: Fresh Start (Recommended for Development)
+#### Option A: Fresh Start (Recommended)
    - Use the fresh start script to clean the database, initialize config, and run the server:
      ```bash
+     # From the root directory (Supervity_AP_Agent/)
      python run_fresh.py
      ```
-     or
+   - **In a separate terminal**, start the frontend:
      ```bash
-     ./run_fresh.sh
-     ```
-   - For a complete database reset (drop and recreate tables):
-     ```bash
-     python run_fresh.py --reset
+     cd supervity-ap-frontend
+     npm run dev
      ```
 
 #### Option B: Standard Start
-   - Execute the run script:
+   - **Start the backend:**
      ```bash
+     # From the root directory
      python run.py
      ```
+   - **In a separate terminal**, start the frontend:
+     ```bash
+     cd supervity-ap-frontend
+     npm run dev
+     ```
 
-   - The API will be available at `http://127.0.0.1:8000`.
-   - Interactive API documentation (via Swagger UI) is available at `http://127.0.0.1:8000/docs`.
+   - The frontend will be available at `http://localhost:3000`.
+   - The backend API docs will be at `http://127.0.0.1:8000/docs`.
+
 
 ## 🧪 Testing the System (Quickstart)
 
-### Method 1: Using Fresh Start (Recommended)
-1.  **Start fresh** (cleans DB, initializes config, and starts server):
-    ```bash
-    python run_fresh.py
-    ```
+1.  **Start fresh** using `python run_fresh.py` as described above.
 2.  **Generate sample data:**
     ```bash
+    # From the root directory
     python scripts/data_generator.py
     ```
-
-### Method 2: Manual Setup
-1.  **Reset the database** as shown above.
-2.  **Generate sample data:**
-    ```bash
-    python scripts/data_generator.py
-    ```
-3.  **Start the application** with `python run.py`.
-
-### Next Steps (Both Methods)
+    This will create PDF documents in the `sample_data/arcelormittal_documents/` directory.
+3.  **Start the frontend** (`npm run dev`) if you haven't already.
 4.  **Upload documents:**
-    - Go to the API docs at `http://127.0.0.1:8000/docs`.
-    - Use the `POST /api/documents/upload` endpoint to upload all the PDF files from the `sample_data/arcelormittal_documents` directory.
-5.  **Interact with the Copilot:**
-    - Use the `POST /api/copilot/chat` endpoint in the API docs (or a connected frontend) to ask the questions listed in "The AP Copilot" section above.
-    - Observe the console logs to see the agent's reasoning and tool usage.
+    -   Navigate to the **Data Center** page at `http://localhost:3000/data-center`.
+    -   Click the upload box and select all the PDF files from `sample_data/arcelormittal_documents/`.
+    -   Click "Process Documents" and observe the job progress.
+5.  **Review and Resolve:**
+    -   Once the job is complete, go to the **Resolution Workbench** at `http://localhost:3000/resolution-workbench`.
+    -   Select invoices from the queue to view exceptions, compare line items, and approve/reject them.
+6.  **Interact with the Copilot:**
+    -   Click the "Ask Copilot" button in the header.
+    -   Try prompts like: *"Show me a KPI summary"*, *"What's the problem with invoice INV-AM-98002?"*, *"Draft an email for the quantity mismatch on INV-AM-98003."*
 
 ## 🏗️ Project Structure
 
 ```
-Tungsten_AP_Agent/
-├── .env                    # Store your API key here
-├── run.py                  # Main startup script
+Supervity_AP_Agent/
+├── run_fresh.py                # Recommended startup script
+├── run.py                      # Standard startup script
 ├── requirements.txt
-├── README.md               # This file
-├── ap_data.db              # SQLite database file
-├── sample_data/            # Sample PDFs and PDF generation templates
-├── generated_documents/    # Output directory for regenerated PDFs
-├── scripts/                # Helper scripts (data generation, db cleanup)
-│   ├── data_generator.py
-│   └── cleanup_db.py
-└── src/app/                # Main application source code
-    ├── main.py             # FastAPI app initialization and routing
-    ├── config.py           # Application configuration
-    ├── api/                # API endpoints
-    │   └── endpoints/
-    │       ├── copilot.py
-    │       ├── dashboard.py
-    │       └── invoices.py
-    ├── db/                 # Database setup
-    │   ├── models.py       # SQLAlchemy ORM models
-    │   ├── schemas.py      # Pydantic data validation schemas
-    │   └── session.py
-    ├── modules/            # Core business logic modules
-    │   ├── ingestion/      # Document extraction (IDP)
-    │   │   ├── extractor.py
-    │   │   └── service.py
-    │   ├── matching/       # 3-way matching engine
-    │   │   └── engine.py
-    │   └── copilot/        # The AI Copilot agent and its tools
-    │       ├── agent.py
-    │       └── tools.py
-    └── utils/              # Shared utilities
+├── README.md
+├── ap_data.db                  # SQLite database file
+├── sample_data/                # Sample PDFs and PDF generation templates
+├── generated_documents/        # Output for regenerated PDFs
+├── scripts/                    # Helper scripts (data generation, db cleanup)
+│   └── ...
+├── src/app/                    # FastAPI backend source code
+│   ├── main.py                 # FastAPI app initialization
+│   ├── config.py
+│   ├── api/                    # API endpoints
+│   ├── db/                     # Database models and session
+│   ├── modules/                # Core business logic (Ingestion, Matching, Copilot)
+│   └── ...
+└── supervity-ap-frontend/      # Next.js frontend application
+    ├── public/
+    ├── src/
+    │   ├── app/                # Next.js App Router (Pages)
+    │   ├── components/         # Reusable React components
+    │   └── lib/                # API client, context, utils
+    └── ...
 ```

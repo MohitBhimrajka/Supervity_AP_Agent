@@ -2,17 +2,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-blue-primary: #000b37;
-  --color-green-success: #85c20b;
-  --color-gray-dark: #474747;
-  --color-gray-light: #c7c7c7;
-  --color-blue-light: #8289ec;
-  --color-green-light: #c3fb54;
-  --color-orange-warning: #ff9a5a;
-  --color-purple-accent: #b181ff;
-  --color-cyan-accent: #31b8e1;
-  --color-pink-destructive: #ff94a8;
+  /* Supervity Brand Palette */
+  --color-blue-primary: #0A2540;   /* A deep, professional navy */
+  --color-green-success: #00875A;  /* A strong, clear green */
+  --color-orange-warning: #FF7426; /* A vibrant, attention-grabbing orange */
+  --color-pink-destructive: #DE350B; /* A clear, standard red for errors */
+  --color-purple-accent: #5243AA;  /* A sophisticated purple accent */
+  --color-cyan-accent: #00A3BF;    /* A bright cyan for highlights */
   
+  /* Neutral Palette */
+  --color-gray-dark: #42526E;   /* For primary text */
+  --color-gray-medium: #6B778C;  /* For secondary text, descriptions */
+  --color-gray-light: #DFE1E6;  /* For borders */
+  --color-gray-bg: #F4F5F7;      /* For page backgrounds */
+
   --font-sans: 'Inter', sans-serif;
   
   --radius-lg: 0.5rem;
@@ -22,7 +25,7 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #111827;
+  --foreground: #172B4D; /* A darker text color for accessibility */
 }
 
 @theme inline {
@@ -40,8 +43,8 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-gray-bg); /* Use new background color */
+  color: var(--color-gray-dark); /* Use new default text color */
   font-family: 'Inter', sans-serif;
 }
 

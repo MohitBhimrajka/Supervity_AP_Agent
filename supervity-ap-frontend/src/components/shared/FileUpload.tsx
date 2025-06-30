@@ -4,26 +4,31 @@ import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { UploadCloud, File as FileIcon, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { uploadDocuments, type Job } from '@/lib/api'; // Import the real API function
+import { uploadDocuments, type Job } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 interface FileUploadProps {
   onUploadSuccess: (job: Job) => void;
+  maxFiles?: number;
 }
 
-export const FileUpload = ({ onUploadSuccess }: FileUploadProps) => {
+export const FileUpload = ({ onUploadSuccess, maxFiles = 0 }: FileUploadProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    setFiles(prev => [...prev, ...acceptedFiles.filter(
-      file => !prev.some(f => f.name === file.name)
-    )]);
-  }, []);
+    // This logic handles both single and multiple file modes correctly
+    const newFiles = maxFiles === 1 ? acceptedFiles : [
+      ...files,
+      ...acceptedFiles.filter(file => !files.some(f => f.name === file.name))
+    ];
+    setFiles(newFiles);
+  }, [files, maxFiles]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop,
-    accept: { 'application/pdf': ['.pdf'] }
+    accept: { 'application/pdf': ['.pdf'] },
+    maxFiles: maxFiles,
   });
 
   const removeFile = (fileName: string) => {
@@ -33,14 +38,15 @@ export const FileUpload = ({ onUploadSuccess }: FileUploadProps) => {
   const handleUpload = async () => {
     if (files.length === 0 || isUploading) return;
     setIsUploading(true);
+    toast.loading(`Uploading ${files.length} document(s)...`, { id: 'upload-toast' });
     try {
-      const job = await uploadDocuments(files); // Using the real API
-      toast.success(`Successfully uploaded ${files.length} document${files.length > 1 ? 's' : ''}!`);
-      onUploadSuccess(job); // Pass the job to the parent component
+      const job = await uploadDocuments(files);
+      toast.success(`Upload successful! Job #${job.id} is now processing.`, { id: 'upload-toast' });
+      onUploadSuccess(job);
       setFiles([]);
     } catch (error) {
       console.error("Upload failed", error);
-      toast.error(`Upload failed: ${error instanceof Error ? error.message : 'Please try again.'}`);
+      toast.error(`Upload failed: ${error instanceof Error ? error.message : 'Please try again.'}`, { id: 'upload-toast' });
     } finally {
       setIsUploading(false);
     }
@@ -56,19 +62,19 @@ export const FileUpload = ({ onUploadSuccess }: FileUploadProps) => {
         <input {...getInputProps()} />
         <div className="flex flex-col items-center justify-center text-center">
           <UploadCloud className="w-12 h-12 text-gray-dark/80 mb-4" />
-          <p className="font-semibold text-gray-900">
-            {isDragActive ? "Drop the files here ..." : "Drag & drop files here, or click to select"}
+          <p className="font-semibold text-gray-dark">
+            {isDragActive ? "Drop files here ..." : `Drag & drop files here, or click to select`}
           </p>
-          <p className="text-sm text-gray-800 mt-1 font-medium">PDF documents only</p>
+          <p className="text-sm text-gray-medium mt-1 font-medium">PDF documents only</p>
         </div>
       </div>
 
       {files.length > 0 && (
         <div className="mt-6">
           <h3 className="font-semibold text-lg mb-2">Files to Upload:</h3>
-          <ul className="space-y-2">
+          <ul className="space-y-2 max-h-40 overflow-y-auto pr-2">
             {files.map(file => (
-              <li key={file.name} className="flex items-center justify-between p-2 bg-gray-100 rounded-md">
+              <li key={file.name} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
                 <div className="flex items-center">
                   <FileIcon className="w-5 h-5 text-blue-primary mr-3" />
                   <span className="text-sm font-medium">{file.name}</span>

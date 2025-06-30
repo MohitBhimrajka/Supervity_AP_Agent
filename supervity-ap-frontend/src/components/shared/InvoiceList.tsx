@@ -13,6 +13,19 @@ interface InvoiceListProps {
     initialInvoiceId?: string | null;
 }
 
+// --- MODIFIED HELPER FUNCTION ---
+const getCategoryVariant = (category: string | null | undefined): string => {
+    switch (category) {
+        case 'missing_document':
+        case 'policy_violation':
+            return 'border-l-4 border-pink-destructive'; // Use brand color
+        case 'data_mismatch':
+            return 'border-l-4 border-orange-warning'; // Use brand color
+        default:
+            return 'border-l-4 border-transparent';
+    }
+}
+
 export const InvoiceList = ({ selectedInvoiceId, onInvoiceSelect, refreshKey, initialInvoiceId }: InvoiceListProps) => {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -63,10 +76,11 @@ export const InvoiceList = ({ selectedInvoiceId, onInvoiceSelect, refreshKey, in
                         {invoices.map(invoice => (
                             <li key={invoice.invoice_id} onClick={() => onInvoiceSelect(invoice)}
                                 className={cn(
-                                    "p-3 rounded-lg cursor-pointer border transition-colors",
+                                    "p-3 rounded-lg cursor-pointer transition-colors",
+                                    getCategoryVariant(invoice.review_category), // Apply color-coding
                                     selectedInvoiceId === invoice.invoice_id
-                                        ? "bg-blue-primary/10 border-blue-primary"
-                                        : "bg-white hover:bg-gray-50 border-transparent"
+                                        ? "bg-blue-primary/10"
+                                        : "bg-white hover:bg-gray-50"
                                 )}>
                                 <div className="flex justify-between items-center mb-1">
                                     <p className="font-semibold">{invoice.invoice_id}</p>

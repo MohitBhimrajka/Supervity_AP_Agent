@@ -1,5 +1,5 @@
 # src/app/api/endpoints/payments.py
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
@@ -26,11 +26,11 @@ def create_payment_batch(
     db: Session = Depends(get_db)
 ):
     """
-    Creates a payment batch from a list of invoice IDs.
-    This updates their status to 'pending_payment'.
+    Creates a payment batch from a list of invoice IDs, updates their status
+    to 'pending_payment', and stamps them with a unique batch ID.
     """
     if not request.invoice_ids:
-        return {"error": "No invoice IDs provided."}
+        raise HTTPException(status_code=400, detail="No invoice IDs provided.")
 
     invoices = db.query(models.Invoice).filter(
         models.Invoice.id.in_(request.invoice_ids),
@@ -41,16 +41,19 @@ def create_payment_batch(
         # This indicates some IDs were invalid or not in the correct status
         print("Warning: Mismatch in provided invoice IDs and valid payable invoices.")
 
+    if not invoices:
+        raise HTTPException(status_code=400, detail="No valid invoices found to create a batch.")
+
     batch_id = f"PAY-BATCH-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     total_amount = 0
     
     for inv in invoices:
         inv.status = models.DocumentStatus.pending_payment
+        inv.payment_batch_id = batch_id # <-- STAMP THE BATCH ID
         total_amount += inv.grand_total or 0
         
-        # Log the action
         audit_log = models.AuditLog(
-            entity_type='Invoice', entity_id=inv.invoice_id, user='System', # Should be a real user
+            entity_type='Invoice', entity_id=inv.invoice_id, user='System',
             action='Added to Payment Batch', details={"batch_id": batch_id}
         )
         db.add(audit_log)
@@ -58,7 +61,7 @@ def create_payment_batch(
     db.commit()
 
     return {
-        "message": "Payment batch created successfully.",
+        "message": f"Payment batch {batch_id} created successfully.",
         "batch_id": batch_id,
         "processed_invoice_count": len(invoices),
         "total_amount": total_amount,

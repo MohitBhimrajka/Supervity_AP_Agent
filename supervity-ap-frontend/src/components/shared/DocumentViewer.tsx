@@ -13,10 +13,10 @@ import 'react-pdf/dist/Page/TextLayer.css';
 const Document = dynamic(() => import("react-pdf").then((mod) => mod.Document), { ssr: false });
 const Page = dynamic(() => import("react-pdf").then((mod) => mod.Page), { ssr: false });
 
-// --- START FIX: Use a more robust worker configuration ---
-// This method uses the worker from node_modules directly, which is more reliable than a CDN.
+// --- START FIX: This is the definitive fix for react-pdf v10+ ---
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+  // The path is now relative to the root of your site
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 }
 // --- END FIX ---
 
@@ -37,35 +37,41 @@ export const DocumentViewer = ({ filePath }: DocumentViewerProps) => {
   }, []);
 
   useEffect(() => {
+    // FIX 2: Correctly handle URL cleanup to prevent memory leaks
+    let objectUrl: string | null = null;
+
     const loadDocument = async () => {
-      if (filePath) {
-        setIsLoading(true);
-        setError(null);
-        try {
-          const url = await getDocumentFile(filePath);
-          setFileUrl(url);
-        } catch (err) {
-          setError("Could not load document.");
-          setFileUrl(null);
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
+      if (!filePath) {
         setFileUrl(null);
         setError(null);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        // getDocumentFile already returns a blob URL
+        objectUrl = await getDocumentFile(filePath);
+        setFileUrl(objectUrl);
+      } catch {
+        setError("Could not load document.");
+        setFileUrl(null);
+      } finally {
+        setIsLoading(false);
       }
     };
+    
     if(isMounted) {
       loadDocument();
     }
     
-    // Cleanup blob URL on component unmount or when doc changes
+    // Cleanup function
     return () => {
-      if (fileUrl) {
-        URL.revokeObjectURL(fileUrl);
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [filePath, isMounted]);
+  }, [filePath, isMounted]); // FIX 3: Remove fileUrl from dependency array to prevent infinite loop
 
   if (!isMounted) return null; // Prevent rendering on server
 

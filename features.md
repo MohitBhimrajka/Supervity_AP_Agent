@@ -1,9 +1,9 @@
-# Supervity AP Agent: Feature Deep Dive
+# Supervity AP Command Center: Feature Deep Dive
 ### An Intelligent, End-to-End Accounts Payable Automation Platform
 
 ## 1. Executive Summary
 
-The Supervity AP Agent is not just a document processing tool; it is an AI-powered partner for the Accounts Payable department. It automates the entire invoice lifecycle—from ingestion and 3-way matching to payment proposal—while providing an intelligent Copilot that learns from user actions, offers proactive advice, and delivers strategic business insights.
+The Supervity AP Command Center is not just a document processing tool; it is an AI-powered partner for the Accounts Payable department. It automates the entire invoice lifecycle—from ingestion and 3-way matching to payment proposal—while providing an intelligent **AP Copilot** that learns from user actions, offers proactive advice, and delivers strategic business insights.
 
 This document provides a detailed overview of its core components and unique intelligence features.
 
@@ -13,33 +13,14 @@ This document provides a detailed overview of its core components and unique int
 
 The system is built around a robust, event-driven workflow that ensures efficiency, transparency, and continuous learning.
 
-
-┌──────────────────┐ ┌──────────────────┐ ┌───────────────────────────┐
-│ 1. Document ├─────>│ 2. Job Creation ├─────>│ 3. Parallel Document │
-│ Upload (PDFs) │ │ & Tracking │ │ Processing (IDP) │
-└──────────────────┘ └──────────────────┘ └───────────────────────────┘
-^ │
-│ ▼
-┌──────────────────┐ ┌──────────────────┐ ┌───────────────────────────┐
-│ 9. AI Insights & ├<─────┤ 8. Learning Loop ├<─────┤ 4. Data Persisted │
-│ Notifications │ │ (User Actions) │ │ to Database │
-└──────────────────┘ └──────────────────┘ └───────────────────────────┘
-│ │
-▼ ▼
-┌──────────────────┐ ┌──────────────────┐ ┌───────────────────────────┐
-│ 7. User Action ├<─────┤ 6. Dashboard & ├<─────┤ 5. Transparent 3-Way │
-│ via Copilot │ │ Workbench │ │ Matching Engine │
-└──────────────────┘ └──────────────────┘ └───────────────────────────┘
-
-Generated code
 **Workflow Steps:**
-1.  **Document Upload:** Users upload a batch of invoices, POs, and GRNs.
+1.  **Document Upload:** Users upload a batch of invoices, POs, and GRNs via the **Data Center**.
 2.  **Job Tracking:** A processing job is created to track the batch's progress.
 3.  **Intelligent Document Processing (IDP):** The system uses Google Gemini to read each PDF and extract structured data in parallel.
 4.  **Data Persistence:** The extracted data is saved into the database.
 5.  **Transparent 3-Way Matching:** The core engine runs, comparing invoices against POs and GRNs. Every validation step is recorded.
-6.  **Workbench & Dashboard:** Approved invoices move forward, while exceptions are flagged for review in the user-friendly workbench. KPIs are updated on the dashboard.
-7.  **User Action & Copilot:** Users resolve exceptions, approve invoices, or ask the AI Copilot for analysis and assistance.
+6.  **Dashboard & Workbench:** Approved invoices move forward, while exceptions are flagged for review in the user-friendly **Resolution Workbench**. KPIs are updated on the dashboard.
+7.  **User Action & Copilot:** Users resolve exceptions, approve invoices, or ask the **AP Copilot** for analysis and assistance.
 8.  **The Learning Loop:** The system observes how users resolve exceptions and creates "Learned Heuristics."
 9.  **Proactive Insights:** A monitoring service analyzes system data to generate optimization alerts and automation suggestions.
 
@@ -58,30 +39,25 @@ The foundation of the system is its ability to accurately understand documents.
 ### II. Transparent & Robust 3-Way Matching
 This is the core automation engine, designed for trust and accuracy.
 - **Automated Validation:** Automatically matches Invoices against Goods Receipt Notes (GRNs) and Purchase Orders (POs).
-- **Comprehensive Checks:** The engine validates more than just numbers:
-    - **Price Mismatch:** Checks invoice prices against PO prices within a configurable tolerance.
-    - **Quantity Mismatch:** Checks billed quantities against received quantities on the GRN.
-    - **Item Mismatch:** Uses fuzzy matching to ensure items on the invoice exist on the PO.
-    - **Duplicate Invoice Detection:** Flags potential duplicate payments.
-    - **Timing Mismatches:** Ensures document dates are logical (e.g., an invoice isn't dated before goods are received).
+- **Comprehensive Checks:** The engine validates more than just numbers.
 - **The Match Trace:** Every validation step is recorded in a detailed log. This provides **100% transparency**, showing users exactly why an invoice was approved or flagged for review.
 
 ### III. The AP Command Center
 The frontend is designed for two key personas: the AP clerk focused on execution and the manager focused on performance.
-- **Executive Dashboard:** A high-level view of strategic KPIs like **Touchless Invoice Rate**, **Discounts Captured vs. Missed**, and **Top Vendors by Exception Rate**.
-- **Invoice Workbench:** A power-user workspace designed for efficient exception handling. It features a three-column layout with a work queue, a detailed dossier view (including the Match Trace and a document viewer), and the integrated AI Copilot.
-- **Data Explorer:** A powerful search interface that allows users to perform custom queries across all invoice data and export the results.
+- **Executive Dashboard:** A high-level view of strategic KPIs.
+- **Resolution Workbench:** A power-user workspace designed for efficient exception handling. It features a work queue, a detailed dossier view (including the Match Trace and a document viewer), and the integrated AP Copilot.
+- **Invoice Explorer:** A powerful search interface that allows users to perform custom queries across all invoice data and export the results.
 
-### IV. The AI Copilot & Proactive Engine
+### IV. The AP Copilot & Proactive Engine
 This is what elevates the system from simple automation to an intelligent partner.
 - **Conversational Interface:** Users can manage the entire AP process using natural language.
 - **Tool-Augmented AI:** The Copilot can use a wide array of "tools" to interact with the database, perform actions, and generate content.
-- **Proactive Intelligence:** The system doesn't just wait for commands. An internal monitoring service constantly looks for opportunities and risks, generating alerts for the user.
-- **Adaptive Learning:** The system learns from user actions to become smarter and more efficient over time.
+- **Proactive Intelligence:** The system doesn't just wait for commands. An internal monitoring service constantly looks for opportunities and risks.
+- **Adaptive Learning:** The system learns from user actions to become smarter and more efficient over time, with learnings visible in the **Learned Insights** page.
 
 ---
 
-## 4. Deep Dive: The AI Copilot's Toolkit
+## 4. Deep Dive: The AP Copilot's Toolkit
 
 The Copilot's power comes from its ability to use a wide range of tools. Below is a summary of its capabilities.
 

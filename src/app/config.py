@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
     
     # Database
-    database_url: str = "sqlite:///./app.db"
+    database_url: str = "sqlite:///./ap_data.db"
     
     # Google GenAI
     google_api_key: str = os.getenv("GEMINI_API_KEY", "")

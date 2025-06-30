@@ -23,7 +23,9 @@ export const PoDetailsTable = ({ comparisonData }: { comparisonData: ComparisonD
                     <TableRow key={po.po_number}>
                         <TableCell className="font-medium">{po.po_number}</TableCell>
                         <TableCell>{po.order_date}</TableCell>
-                        <TableCell className="text-right">${po.po_grand_total?.toFixed(2) ?? 'N/A'}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                            {po.po_grand_total != null ? `$${po.po_grand_total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '$N/A'}
+                        </TableCell>
                     </TableRow>
                 ))}
             </TableBody>

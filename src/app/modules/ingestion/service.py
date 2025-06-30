@@ -1,11 +1,12 @@
 # src/app/modules/ingestion/service.py
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Any
 from datetime import datetime, date
 
 from app.db import models
 from app.modules.ingestion import extractor
+from app.utils import unit_converter
 
 def convert_string_to_date(date_string: str | None) -> date | None:
     """
@@ -81,39 +82,44 @@ def prepare_invoice_data(extracted_data: Dict, job_id: int) -> Dict:
         'job_id': job_id,
     }
 
-def ingest_document(db: Session, job_id: int, file_content: bytes, filename: str) -> Tuple[bool, List[str] | None]:
+def ingest_document(db: Session, job_id: int, file_content: bytes, filename: str) -> Tuple[bool, List[str] | None, Dict[str, Any]]:
     """
     Orchestrates the ingestion of a single document.
     1. Extracts data using the extractor.
-    2. Saves the data and links documents using the new many-to-many relationships.
-    3. Returns success status and a list of all related PO numbers for triggering the match engine.
+    2. Normalizes line item units.
+    3. Saves the data and links documents.
     """
     print(f"--- Ingesting file: {filename} for Job ID: {job_id} ---")
 
     extracted_data = extractor.extract_data_from_pdf(file_content)
     if not extracted_data:
-        print(f"Data extraction failed for {filename}. Skipping.")
-        return False, None
+        msg = f"Data extraction failed for {filename}. The document may be unreadable or not a valid format."
+        print(msg)
+        return False, None, {"error": msg}
 
     doc_type = extracted_data.get("document_type")
     if not doc_type:
-        print(f"Could not determine document type for {filename}. Skipping.")
-        return False, None
+        msg = f"Could not determine document type for {filename}."
+        print(msg)
+        return False, None, {"error": msg}
+        
+    if 'line_items' in extracted_data and extracted_data['line_items']:
+        normalized_items = []
+        for item in extracted_data['line_items']:
+            normalized_items.append(unit_converter.normalize_item(item))
+        extracted_data['line_items'] = normalized_items
+        print(f"    -> Normalized {len(normalized_items)} line item(s) for {filename}.")
 
-    # Validate required fields before processing
     is_valid, error_message = validate_required_fields(extracted_data, doc_type)
     if not is_valid:
         print(f"Validation failed for {filename}: {error_message}. Skipping.")
-        return False, None
+        return False, None, {"error": error_message}
 
-    # This will now collect all PO numbers affected by this ingestion
     affected_po_numbers: set[str] = set()
 
     try:
         if doc_type == "Purchase Order":
-            # The PO number is the primary key, so we need to handle duplicates gracefully
             po_number = extracted_data.get("po_number")
-            
             existing_po = db.query(models.PurchaseOrder).filter_by(po_number=po_number).first()
             if existing_po:
                 print(f"Purchase Order {po_number} already exists. Skipping creation.")
@@ -127,7 +133,6 @@ def ingest_document(db: Session, job_id: int, file_content: bytes, filename: str
         elif doc_type == "Goods Receipt Note":
             grn_number = extracted_data.get("grn_number")
             po_number = extracted_data.get("po_number")
-
             existing_grn = db.query(models.GoodsReceiptNote).filter_by(grn_number=grn_number).first()
             if existing_grn:
                 print(f"GRN {grn_number} already exists. Skipping creation.")
@@ -138,24 +143,21 @@ def ingest_document(db: Session, job_id: int, file_content: bytes, filename: str
                 
                 grn_data = prepare_grn_data(extracted_data)
                 grn_data['file_path'] = filename
-                grn_data['po'] = po  # Link via the relationship
+                grn_data['po'] = po
                 db_grn = models.GoodsReceiptNote(**grn_data)
                 db.add(db_grn)
             affected_po_numbers.add(po_number)
             
         elif doc_type == "Invoice":
             invoice_id = extracted_data.get("invoice_id")
-            
             existing_invoice = db.query(models.Invoice).filter_by(invoice_id=invoice_id).first()
             if existing_invoice:
                  print(f"Invoice {invoice_id} already exists. Skipping creation.")
             else:
-                # Create the invoice object with proper date conversion
                 invoice_data = prepare_invoice_data(extracted_data, job_id)
                 invoice_data['file_path'] = filename
                 db_invoice = models.Invoice(**invoice_data)
 
-                # Now, link it to existing POs and GRNs
                 po_numbers_to_link = extracted_data.get("related_po_numbers", [])
                 grn_numbers_to_link = extracted_data.get("related_grn_numbers", [])
 
@@ -174,23 +176,25 @@ def ingest_document(db: Session, job_id: int, file_content: bytes, filename: str
 
                 db.add(db_invoice)
         else:
-            print(f"Unknown document type '{doc_type}' for {filename}. Skipping.")
-            return False, None
+            msg = f"Unknown document type '{doc_type}' for {filename}."
+            print(msg)
+            return False, None, {"error": msg}
 
         db.commit()
-        print(f"Successfully processed {doc_type} from {filename} into database.")
-        return True, list(affected_po_numbers)
+        print(f"Successfully processed and saved {doc_type} from {filename} to database.")
+        return True, list(affected_po_numbers), extracted_data
 
     except IntegrityError as e:
         db.rollback()
-        # This is a critical error (e.g., trying to create a duplicate invoice_id)
-        print(f"Database integrity error for {filename}: {e}. Record will be skipped.")
-        return False, None
+        msg = f"Database integrity error for {filename}. A document with this ID likely already exists."
+        print(f"{msg}: {e}")
+        return False, None, {"error": msg, **extracted_data}
     except Exception as e:
         db.rollback()
-        print(f"An unexpected error occurred while saving data for {filename}: {e}")
         import traceback
         traceback.print_exc()
-        return False, None
+        msg = f"An unexpected error occurred while saving data for {filename}: {e}"
+        print(msg)
+        return False, None, {"error": msg, **extracted_data}
 
  
