@@ -52,7 +52,41 @@ The heart of the system is the AP Copilot. It's designed to understand the conte
 >
 > **Copilot:** "I have generated a new PDF for PO-78003. You can find it at `generated_documents/REGEN_PO-78003_... .pdf`."
 
-## 📋 Setup and Running the Application
+## 🐳 Running with Docker (Recommended)
+
+This is the easiest way to get the entire application running with a single command.
+
+### 1. Prerequisites
+*   Docker and Docker Compose installed.
+*   A Google Gemini API Key.
+
+### 2. Setup
+   - **Create a `.env` file** in the project root (`Supervity_AP_Agent/`) by copying `env.example`:
+     ```bash
+     cp env.example .env
+     ```
+   - **Edit the `.env` file** and add your actual Gemini API key:
+     ```
+     GEMINI_API_KEY="your_actual_api_key_here"
+     ```
+
+### 3. Build and Run
+   - From the root directory (`Supervity_AP_Agent/`), run:
+     ```bash
+     docker-compose up --build
+     ```
+   - This will build both the backend and frontend images and start the services.
+   - The frontend will be available at `http://localhost:3000`.
+   - The backend API docs will be at `http://localhost:8000/docs`.
+
+### 4. Stopping the Application
+   - Press `Ctrl+C` in the terminal where `docker-compose` is running.
+   - To remove the containers, run:
+     ```bash
+     docker-compose down
+     ```
+
+## 📋 Local Setup (Without Docker)
 
 ### 1. Prerequisites
 *   Python 3.10+
@@ -132,8 +166,7 @@ The heart of the system is the AP Copilot. It's designed to understand the conte
 3.  **Start the frontend** (`npm run dev`) if you haven't already.
 4.  **Upload documents:**
     -   Navigate to the **Data Center** page at `http://localhost:3000/data-center`.
-    -   Click the upload box and select all the PDF files from `sample_data/arcelormittal_documents/`.
-    -   Click "Process Documents" and observe the job progress.
+    -   Click "Sync Sample Data". This ingests all the PDFs you just generated.
 5.  **Review and Resolve:**
     -   Once the job is complete, go to the **Resolution Workbench** at `http://localhost:3000/resolution-workbench`.
     -   Select invoices from the queue to view exceptions, compare line items, and approve/reject them.
@@ -145,6 +178,8 @@ The heart of the system is the AP Copilot. It's designed to understand the conte
 
 ```
 Supervity_AP_Agent/
+├── Dockerfile                  # Backend Dockerfile
+├── docker-compose.yml          # Docker Compose orchestration file
 ├── run_fresh.py                # Recommended startup script
 ├── run.py                      # Standard startup script
 ├── requirements.txt
@@ -162,6 +197,7 @@ Supervity_AP_Agent/
 │   ├── modules/                # Core business logic (Ingestion, Matching, Copilot)
 │   └── ...
 └── supervity-ap-frontend/      # Next.js frontend application
+    ├── Dockerfile              # Frontend Dockerfile
     ├── public/
     ├── src/
     │   ├── app/                # Next.js App Router (Pages)

@@ -10,7 +10,8 @@ from app.config import settings
 # Configure the Gemini client
 client = None
 try:
-    client = genai.Client(api_key=settings.google_api_key)
+    # Use the unified key from settings
+    client = genai.Client(api_key=settings.gemini_api_key)
     print("Ingestion GenAI client configured successfully")
 except Exception as e:
     print(f"Ingestion GenAI client configuration failed, check API key. Error: {e}")

@@ -7,14 +7,24 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings(BaseSettings):
-    # This tells Pydantic to load variables from a .env file
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-    
-    # Database
+    # This tells Pydantic to load variables from a .env file and the environment.
+    # `case_sensitive=False` allows DATABASE_URL env var to map to `database_url`.
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False
+    )
+
+    # --- Database Configuration ---
+    # Can be overridden by setting the DATABASE_URL environment variable.
+    # e.g. DATABASE_URL="postgresql://user:password@host:port/dbname"
+    # Default is a local SQLite file for simple setup.
     database_url: str = "sqlite:///./ap_data.db"
     
-    # Google GenAI
-    google_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    # --- Google GenAI Configuration ---
+    # Can be overridden by setting the GEMINI_API_KEY environment variable.
+    gemini_api_key: str = ""
+    
     # Updated model name for the new Gemini API
     gemini_model_name: str = "gemini-2.5-flash"
 

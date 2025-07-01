@@ -10,7 +10,8 @@ from google.genai import types
 # Configure the Gemini client
 client = None
 try:
-    client = genai.Client(api_key=settings.google_api_key)
+    # Use the unified key from settings
+    client = genai.Client(api_key=settings.gemini_api_key)
     print("Copilot GenAI client configured successfully")
 except Exception as e:
     print(f"Copilot GenAI client configuration failed, check API key. Error: {e}")

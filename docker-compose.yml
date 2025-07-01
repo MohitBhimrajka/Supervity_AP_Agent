@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: supervity_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the db file for persistence with SQLite
+      - ./ap_data.db:/app/ap_data.db
+      # Mount data folders to see generated/uploaded files on the host
+      - ./sample_data:/app/sample_data
+      - ./generated_documents:/app/generated_documents
+    env_file:
+      # Load environment variables from a .env file in this directory
+      - .env
+    environment:
+      # Use the SQLite DB inside the container volume by default
+      - DATABASE_URL=sqlite:///./ap_data.db
+      # Set to production mode to disable reload and bind to 0.0.0.0
+      - APP_ENV=production
+    # The default command from the Dockerfile (run_fresh.py) is sufficient.
+    # For a persistent production setup, you might change this after the first run to:
+    # command: ["python", "run.py"]
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./supervity-ap-frontend
+      dockerfile: Dockerfile
+    container_name: supervity_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # Point to the backend service using its name, not localhost
+      - NEXT_PUBLIC_API_BASE_URL=http://backend:8000/api
+    depends_on:
+      - backend
+    restart: unless-stopped 

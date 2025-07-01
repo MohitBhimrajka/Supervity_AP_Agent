@@ -46,18 +46,29 @@ async def upload_documents(
     db: Session = Depends(get_db)
 ):
     """
-    Accepts multiple PDF files, reads them into memory, creates a job, 
+    Accepts multiple PDF files, SAVES THEM TO DISK, creates a job, 
     and starts a background task with the file data.
     """
     if not files:
         raise HTTPException(status_code=400, detail="No files were uploaded.")
     
-    # Read files into memory before the request ends
+    # Ensure the upload directory exists
+    os.makedirs(PDF_STORAGE_PATH, exist_ok=True)
+    
     file_data_list: List[Dict[str, Any]] = []
     for file in files:
+        # Read content into memory first to pass to background task
+        content = await file.read()
+        
+        # Define the file path and save the file to disk
+        file_path = os.path.join(PDF_STORAGE_PATH, file.filename)
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+        
+        # Add to the list for the background task
         file_data_list.append({
             "filename": file.filename,
-            "content": await file.read()
+            "content": content
         })
     
     # Create a new job record in the database
